@@ -1,0 +1,27 @@
+[
+  {
+    "start_date_local": "2026-09-18T07:00:00",
+    "type": "Run",
+    "moving_time": 2400,
+    "name": "Easy run",
+    "icu_training_load": 35
+  },
+  {
+    "start_date_local": "2026-09-17T18:00:00",
+    "type": "Ride",
+    "moving_time": 3600,
+    "name": "Z2 ride"
+  },
+  {
+    "start_date_local": "2026-09-16T06:30:00",
+    "type": "Swim",
+    "moving_time": 2700,
+    "name": "Pool"
+  },
+  {
+    "start_date_local": "2026-09-10T07:00:00",
+    "type": "Run",
+    "moving_time": 1800,
+    "name": "Short run"
+  }
+]

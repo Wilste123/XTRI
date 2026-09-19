@@ -1,0 +1,10 @@
+.DS_Store
+.env
+**/.env
+coach-bot/.venv/
+.venv/
+data/cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
