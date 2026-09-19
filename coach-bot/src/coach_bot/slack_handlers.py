@@ -46,9 +46,17 @@ def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Setti
             return True
         return user_id in allowed
 
+    def _is_dm(event: dict) -> bool:
+        channel_type = event.get("channel_type")
+        if channel_type == "im":
+            return True
+        channel = event.get("channel") or ""
+        # Some Socket Mode payloads omit channel_type; IM channels start with D
+        return isinstance(channel, str) and channel.startswith("D")
+
     @app.event("message")
     def on_dm_message(event, client: WebClient, say):
-        if event.get("channel_type") != "im":
+        if not _is_dm(event):
             return
         if event.get("bot_id") or event.get("subtype"):
             return
