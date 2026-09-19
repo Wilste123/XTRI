@@ -11,12 +11,24 @@ Fyll inn (ingen av disse i git):
 |----------|-------------------|
 | `SLACK_BOT_TOKEN` | Slack app → OAuth → Bot User OAuth Token |
 | `SLACK_SIGNING_SECRET` | Slack app → Basic Information |
-| `ALLOWED_SLACK_USER_IDS` | Slack profil → Copy member ID |
+| `SLACK_APP_TOKEN` | Slack app → Socket Mode → App-Level Token (`connections:write`) |
+| `ALLOWED_SLACK_USER_IDS` | Slack profil → Copy member ID (`U0BSCE53YF2` for William) |
+| `SLACK_NOTIFY_USER_IDS` | Samme som over (proaktive meldinger) |
 | `REPO_ROOT` | `/Users/william/XTRI` |
-| `INTERVALS_ATHLETE_ID` | intervals.icu Settings |
+| `INTERVALS_ATHLETE_ID` | `i303008` (intervals.icu Settings) |
 | `INTERVALS_API_KEY` | intervals.icu Settings → Developer |
 | `OPENAI_API_KEY` | platform.openai.com |
 | `COACH_MODEL` | `gpt-4o-mini` (standard) |
+
+**Rask start (Mac):** etter `git pull`, fra `coach-bot/`:
+
+```bash
+./scripts/bootstrap-env.sh   # lager .env med Intervals + Slack user ID + V3 defaults
+# Lim inn Slack-tokens og OPENAI_API_KEY i .env
+./scripts/start.sh
+```
+
+Fly: `./scripts/fly-secrets-from-env.sh` når `.env` er komplett.
 
 Valider at filen ikke er tracket:
 
