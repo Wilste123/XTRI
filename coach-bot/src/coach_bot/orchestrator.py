@@ -7,7 +7,14 @@ from slack_sdk import WebClient
 from coach_bot.charts import render_ctl_atl_chart, render_discipline_week_chart
 from coach_bot.coach_reply import CoachReply
 from coach_bot.context_builder import ContextBuilder
-from coach_bot.intent import Intent, detect_intent, strip_log_prefix
+from coach_bot.intent import (
+    Intent,
+    asks_capabilities,
+    asks_for_charts,
+    asks_for_plan_sync,
+    detect_intent,
+    strip_log_prefix,
+)
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.intervals_planner import events_for_active_week, parse_single_workout_request
 from coach_bot.llm_client import LlmClient

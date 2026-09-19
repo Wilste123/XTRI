@@ -1,4 +1,10 @@
-from coach_bot.intent import Intent, detect_intent, strip_log_prefix
+from coach_bot.intent import (
+    Intent,
+    asks_capabilities,
+    asks_for_plan_sync,
+    detect_intent,
+    strip_log_prefix,
+)
 
 
 def test_detect_status():

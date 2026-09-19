@@ -50,13 +50,13 @@ def detect_intent(message: str, has_history: bool = False) -> Intent:
     if lower in ("nullstill", "reset", "ny samtale"):
         return Intent.GENERAL
 
-    if any(k in lower for k in ("graf", "chart", "visualiser")):
+    if asks_for_charts(text):
         return Intent.CHART
 
     if any(k in lower for k in ("analyse", "advanced", "dybde", "acwr")):
         return Intent.ANALYSIS
 
-    if any(
+    if asks_for_plan_sync(text) or any(
         k in lower
         for k in (
             "legg inn uke",
@@ -128,3 +128,45 @@ def detect_intent(message: str, has_history: bool = False) -> Intent:
 
 def strip_log_prefix(message: str) -> str:
     return _LOG_PREFIX.sub("", message.strip()).strip()
+
+
+def asks_for_charts(message: str) -> bool:
+    lower = (message or "").lower()
+    return any(k in lower for k in ("graf", "chart", "visualiser", "figur", "plot"))
+
+
+def asks_for_plan_sync(message: str) -> bool:
+    lower = (message or "").lower()
+    plan_words = (
+        "treningsplan",
+        "treingsplan",
+        "ukeplan",
+        "treningsplaner",
+        "kalender",
+        "intervals",
+    )
+    action_words = (
+        "legg inn",
+        "legge inn",
+        "legg til",
+        "synk",
+        "synke",
+        "opprett",
+        "lage",
+        "kan du",
+        "putt",
+        "importer",
+    )
+    return any(p in lower for p in plan_words) and any(a in lower for a in action_words)
+
+
+def asks_capabilities(message: str) -> bool:
+    """Natural questions like «kan du lage grafer og legge inn plan?»"""
+    lower = (message or "").lower()
+    if asks_for_charts(message) and asks_for_plan_sync(message):
+        return True
+    if "kan du" in lower and asks_for_charts(message):
+        return True
+    if "kan du" in lower and any(p in lower for p in ("treningsplan", "ukeplan", "kalender")):
+        return True
+    return False

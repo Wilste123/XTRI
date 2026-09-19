@@ -28,7 +28,10 @@ _INTENT_HINTS = {
     Intent.GENERAL: "Svar konkret; bruk COACH_BRIEF for tall. Dialog – referer til tidligere i tråden.",
     Intent.ANALYSIS: "Forklar ADVANCED-seksjonen i COACH_BRIEF med klare anbefalinger.",
     Intent.SYNC_WEEK: "Hjelp med kalender-sync; ikke finn på at økter er lagt inn uten bekreftelse.",
-    Intent.CHART: "Kommenter grafer som følger meldingen; ikke finn opp tall.",
+    Intent.CHART: (
+        "Graf-bilder (CTL/ATL, disiplinvolum) legges ved denne Slack-meldingen automatisk. "
+        "Forklar kort hva de viser; aldri si at du ikke kan lage grafer."
+    ),
 }
 
 

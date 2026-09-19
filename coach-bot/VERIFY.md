@@ -6,7 +6,8 @@
 - [ ] `./scripts/start.sh` kjører
 - [ ] `curl http://localhost:3000/ready` → `ok: true`
 - [ ] DM åpnet med appen i Slack
-- [ ] Slack app-scopes: `chat:write`, `im:write`, `im:history` (Socket Mode)
+- [ ] Slack app-scopes: `chat:write`, `im:write`, `im:history`, `files:write` (grafer)
+- [ ] Kjører **V2**-kode (merge PR / restart `./scripts/start.sh` eller `fly deploy`)
 
 ## Tester
 
