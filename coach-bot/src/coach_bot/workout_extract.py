@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import date, timedelta
 from typing import Any
@@ -151,13 +152,17 @@ def extract_workout_from_text(
     if "intervall" in lower and sport == "Ride":
         name = name if "intervall" in name.lower() else f"Sykkelintervall {mins} min"
 
+    name = name[:80]
+    # Stabil id på tvers av prosess-restart (Pythons hash() er randomisert),
+    # slik at upsert oppdaterer samme økt i stedet for å lage duplikat.
+    name_hash = int(hashlib.sha1(name.encode("utf-8")).hexdigest(), 16) % 10000
     return {
         "category": "WORKOUT",
         "type": sport,
         "start_date_local": f"{target.isoformat()}T00:00:00",
-        "name": name[:80],
+        "name": name,
         "description": desc,
         "planned_duration": mins * 60,
-        "external_id": f"lofoten-coach-single-{target.isoformat()}-{mins}-{hash(name) % 10000}",
+        "external_id": f"lofoten-coach-single-{target.isoformat()}-{mins}-{name_hash}",
     }
 
