@@ -12,12 +12,21 @@ Slack-bot som leser **intervals.icu** (økter, wellness, kalenderplan) og **LOFO
 
 ## Oppsett
 
-1. Kopier `.env.example` → `.env` og fyll inn nøkler.
-2. Les [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) for Slack-app og tunnel.
-3. Legg ukentlig plan som **events** i intervals.icu.
-4. Oppdater [LOFOTEN-2027/CURRENT_STATUS.md](../LOFOTEN-2027/CURRENT_STATUS.md).
+Full sjekkliste: [docs/KOM_I_GANG.md](../docs/KOM_I_GANG.md)
+
+1. [SETUP_ENV.md](SETUP_ENV.md) – `.env` fra `.env.example`
+2. [docs/INTERVALS_QUICKSTART.md](../docs/INTERVALS_QUICKSTART.md) – sync + kalender
+3. [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) – Slack-app og tunnel
+4. [LOFOTEN-2027/CURRENT_STATUS.md](../LOFOTEN-2027/CURRENT_STATUS.md)
+5. Verifiser: [VERIFY.md](VERIFY.md)
 
 ## Kjøre lokalt
+
+```bash
+./scripts/start.sh
+```
+
+Eller manuelt:
 
 ```bash
 cd coach-bot

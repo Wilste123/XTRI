@@ -27,6 +27,14 @@ Se [06_TESTRESULTATER.md](06_TESTRESULTATER.md) – baseline ikke fullført enn�
 - [ ] Fullfør baseline-testuke
 - [ ] 4 uker Base_0 logget i Intervals
 
+## Coach / verktøy
+
+| | Status |
+|---|--------|
+| GitHub repo | https://github.com/Wilste123/XTRI |
+| Slack coach V1 | Sett opp – se [docs/KOM_I_GANG.md](../docs/KOM_I_GANG.md) |
+| Intervals kalenderplan | Fyll denne + neste uke som events |
+
 ## Kort notat (valgfritt)
 
 Prosjekt startet. Coach-bot V1 kobler Slack + Intervals + dette repoet.

@@ -1,5 +1,7 @@
 # Testresultater
 
+**Sjekkliste:** Gjennomfør [ukeplan/baseline-uke.md](ukeplan/baseline-uke.md), fyll tabellene under, oppdater [CURRENT_STATUS.md](CURRENT_STATUS.md).
+
 ## Baseline-testuke (uke 1 – prosjektstart)
 
 **Formål:** Reproducerbare referanser uten laboratorium. **Ikke** maks på alle disipliner samme uke.
