@@ -5,8 +5,17 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [[ ! -f .env ]]; then
-  echo "Mangler .env – kopier fra .env.example og fyll inn nøkler:"
+  echo "Mangler coach-bot/.env (filen er kun lokalt – ikke i git)."
+  echo ""
   echo "  cp .env.example .env"
+  echo "  open -e .env    # eller nano .env"
+  echo ""
+  echo "Fyll inn minst:"
+  echo "  SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET"
+  echo "  ALLOWED_SLACK_USER_IDS, REPO_ROOT=/Users/william/XTRI"
+  echo "  INTERVALS_ATHLETE_ID, INTERVALS_API_KEY, OPENAI_API_KEY"
+  echo ""
+  echo "Guide: SETUP_ENV.md og ../docs/SLACK_SETUP.md"
   exit 1
 fi
 
