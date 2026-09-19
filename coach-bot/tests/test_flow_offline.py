@@ -86,6 +86,13 @@ class FakeIntervals:
         self.bulk.extend(events)
         return events
 
+    def get_events(self, oldest, newest):
+        return []
+
+    def delete_event(self, event_id):
+        self.deleted = getattr(self, "deleted", [])
+        self.deleted.append(event_id)
+
     def ping(self) -> None:
         return None
 
@@ -321,6 +328,90 @@ _PLAN_LLM_TEXT = (
 class PlanLlm(FakeLlm):
     def complete_chat(self, *args, **kwargs) -> str:
         return _PLAN_LLM_TEXT
+
+
+class ToolCallingLlm(FakeLlm):
+    """Simulates a model that calls tools (function calling) offline."""
+
+    def complete_agentic(
+        self,
+        context,
+        user_message,
+        *,
+        history_messages=None,
+        tools=None,
+        tool_executor=None,
+        intent=Intent.GENERAL,
+        max_iters=5,
+    ) -> str:
+        low = user_message.lower()
+        if tool_executor and ("plan" in low or "uke" in low):
+            tool_executor(
+                "create_workouts",
+                {
+                    "workouts": [
+                        {"date": "2026-09-20", "sport": "run", "duration_min": 45},
+                        {"date": "2026-09-21", "sport": "bike", "duration_min": 60},
+                        {"date": "2026-09-22", "sport": "swim", "duration_min": 30},
+                    ]
+                },
+            )
+            return "Her er et forslag til uken. Si ifra om du vil ha den inn."
+        if tool_executor and ("vondt" in low or "skade" in low):
+            facts = tool_executor("search_knowledge", {"query": user_message})
+            return f"Basert på det jeg vet: {facts[:60]}"
+        if tool_executor and ("graf" in low or "visuell" in low):
+            tool_executor("render_charts", {})
+            return "Her kommer grafene."
+        return "Alt vel – hva vil du ta tak i?"
+
+
+def test_agentic_creates_plan_via_tool(orch):
+    o = orch["orch"]
+    o._llm = ToolCallingLlm()
+    preview = o.run_chat("lag en plan for uken", user_id="UA")
+    # Modellen kalte create_workouts -> økter staged + forhåndsvisning + affordance.
+    assert preview.blocks
+    assert "ja" in preview.text.lower()
+    assert not orch["intervals"].bulk
+    confirm = o.run_chat("ja", user_id="UA")
+    assert "Lagt inn" in confirm.text
+    assert len(orch["intervals"].bulk) == 3
+
+
+def test_agentic_knowledge_lookup(orch):
+    o = orch["orch"]
+    o._llm = ToolCallingLlm()
+    r = o.run_chat("jeg har vondt i kneet, hva gjør jeg?", user_id="UB")
+    assert "kan ikke" not in r.text.lower()
+    assert r.text.strip()
+
+
+def test_agentic_charts_via_tool(orch):
+    o = orch["orch"]
+    o._llm = ToolCallingLlm()
+    r = o.run_chat("vis formen min som graf", user_id="UC")
+    # render_charts-verktøyet -> grafer vedlagt
+    assert r.image_paths
+
+
+def test_intervals_ops_commit_on_ja(orch):
+    # Simuler at et verktøy har staged endringer (flytt + slett), så bekreft.
+    o = orch["orch"]
+    o._sessions.set_pending(
+        "UZ",
+        "intervals_ops",
+        {
+            "ops": [
+                {"op": "upsert", "event": {"id": 1, "name": "Løp", "start_date_local": "2026-09-21T00:00:00"}},
+                {"op": "delete", "id": 2, "label": "slett"},
+            ]
+        },
+    )
+    r = o.run_chat("ja", user_id="UZ")
+    assert "oppdatert" in r.text.lower()
+    assert orch["intervals"].bulk  # upsert utført
+    assert getattr(orch["intervals"], "deleted", []) == [2]  # delete utført
 
 
 def test_full_plan_write_from_chat(orch):

@@ -38,6 +38,25 @@ _INTENT_HINTS = {
 }
 
 
+_TOOL_GUIDE = (
+    "Du har verktøy – bruk dem aktivt i stedet for bare å beskrive:\n"
+    "- create_workouts: når William vil ha økter i kalenderen (én eller en hel "
+    "uke). Oppgi ekte ISO-datoer (YYYY-MM-DD). Øktene opprettes FØRST når han "
+    "bekrefter med «ja» – du staged dem.\n"
+    "- adjust_load: juster planlagt belastning i en periode med prosent (f.eks. "
+    "«gjør uka 20% lettere» -> percent=-20).\n"
+    "- move_workout / delete_workout: flytt eller fjern planlagte økter.\n"
+    "- search_knowledge: slå opp fagkunnskap (trening/skade/ernæring/race) FØR du "
+    "gir faglige råd – vær presis, på nivå med en topptrener, ikke overfladisk.\n"
+    "- web_search (hvis tilgjengelig): for ferske/uforutsette fakta som ikke er i "
+    "kunnskapsbasen (nytt utstyr, race-oppdateringer, ny forskning).\n"
+    "- render_charts: når han vil se en graf eller visuell fremstilling.\n"
+    "- log_note: når han rapporterer smerte/søvn/form som bør noteres.\n"
+    "Alle kalender-endringer krever «ja» før de utføres. Aldri si at du «ikke "
+    "kan» noe av dette – bruk verktøyet."
+)
+
+
 def load_system_prompt() -> str:
     path = _PROMPTS_DIR / "system.md"
     return path.read_text(encoding="utf-8")
@@ -54,6 +73,22 @@ class LlmClient(ABC):
         history_messages: list[dict[str, str]] | None = None,
     ) -> str:
         ...
+
+    def complete_agentic(
+        self,
+        context: str,
+        user_message: str,
+        *,
+        history_messages: list[dict[str, str]] | None = None,
+        tools: list[dict] | None = None,
+        tool_executor=None,
+        intent: Intent = Intent.GENERAL,
+        max_iters: int = 5,
+    ) -> str:
+        """Default: no tool support – behave like plain chat."""
+        return self.complete_chat(
+            context, user_message, intent=intent, history_messages=history_messages
+        )
 
 
 class OpenAILlmClient(LlmClient):
@@ -109,3 +144,79 @@ class OpenAILlmClient(LlmClient):
         )
         content = response.choices[0].message.content
         return content or "(tomt svar fra modell)"
+
+    def complete_agentic(
+        self,
+        context: str,
+        user_message: str,
+        *,
+        history_messages: list[dict[str, str]] | None = None,
+        tools: list[dict] | None = None,
+        tool_executor=None,
+        intent: Intent = Intent.GENERAL,
+        max_iters: int = 5,
+    ) -> str:
+        hint = _INTENT_HINTS.get(intent, _INTENT_HINTS[Intent.GENERAL])
+        system = f"{self._system}\n\n{hint}\n\n{_TOOL_GUIDE}"
+        messages: list[dict] = [{"role": "system", "content": system}]
+        if history_messages:
+            for m in history_messages:
+                role = m.get("role", "user")
+                if role in ("user", "assistant"):
+                    messages.append({"role": role, "content": m["content"][:4000]})
+        messages.append(
+            {
+                "role": "user",
+                "content": f"{context}\n\n---\n\nBrukermelding:\n{user_message}",
+            }
+        )
+
+        if not tools or tool_executor is None:
+            resp = self._client.chat.completions.create(
+                model=self._model, messages=messages, temperature=0.5
+            )
+            return resp.choices[0].message.content or "(tomt svar fra modell)"
+
+        for _ in range(max_iters):
+            resp = self._client.chat.completions.create(
+                model=self._model,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+                temperature=0.5,
+            )
+            msg = resp.choices[0].message
+            tool_calls = msg.tool_calls or []
+            if not tool_calls:
+                return msg.content or "(tomt svar fra modell)"
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content or None,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in tool_calls
+                    ],
+                }
+            )
+            for tc in tool_calls:
+                result = tool_executor(tc.function.name, tc.function.arguments)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": str(result)[:6000],
+                    }
+                )
+
+        resp = self._client.chat.completions.create(
+            model=self._model, messages=messages, temperature=0.5
+        )
+        return resp.choices[0].message.content or "(tomt svar fra modell)"

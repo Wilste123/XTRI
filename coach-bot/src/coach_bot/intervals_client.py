@@ -156,6 +156,11 @@ class IntervalsClient:
             return data
         return data.get("events") or data.get("data") or []
 
+    def delete_event(self, event_id: Any) -> None:
+        r = self._client.delete(f"/athlete/{self._athlete_id}/events/{event_id}")
+        r.raise_for_status()
+        self.invalidate_cache()
+
     def create_event(self, event: dict[str, Any]) -> dict[str, Any]:
         created = self.bulk_upsert_events([event])
         if created:
