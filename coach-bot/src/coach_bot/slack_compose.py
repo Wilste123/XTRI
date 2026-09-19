@@ -12,9 +12,11 @@ _HEADING = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 _BOLD_HEADERS = re.compile(r"^\*\*[^*]+\*\*\s*$", re.MULTILINE)
 
 # Setninger der modellen fornekter egne evner eller ber om manuell Intervals-bruk.
-# Slike linjer er feil (boten KAN skrive til Intervals) og fjernes.
+# Slike linjer er feil (boten KAN skrive til Intervals og lage grafer) og fjernes.
 _SELF_DENIAL = re.compile(
     r"(kan\s+ikke\s+(direkte\s+)?(legge?\s+inn|opprette|skrive|synke?)"
+    r"|kan\s+ikke\s+(lage|vise|generere|tilby|gi\s+deg)\s+(en\s+)?"
+    r"(visuell|visuelle|visuelt|grafisk|grafer|graf|figur|diagram|fremstilling|bilde|illustrasjon)"
     r"|f[åa]r\s+ikke\s+lagt\s+inn"
     r"|m[åa]\s+(du\s+)?(selv\s+)?(logge?\s+inn|gj[øo]re\s+det\s+manuelt)"
     r"|manuelt\s+i\s+intervals"
@@ -23,25 +25,45 @@ _SELF_DENIAL = re.compile(
     r"|beklager\s+misforst[åa]elsen)",
     re.IGNORECASE,
 )
+
+# Falske påstander om at boten allerede utfører skrivingen «nå» (den gjør det
+# først etter bekreftelse). Fjernes så modellen ikke lyver om handling.
+_FALSE_ACTION = re.compile(
+    r"(jeg\s+legger\s+(dem|den|disse|inn|[øo]ktene).*\bn[åa]\b"
+    r"|legger\s+(den|dem|disse)\s+inn\s+n[åa]"
+    r"|(jeg|la\s+meg)\s+begynne?r?\s+med\s+[åa]\s+legge\s+inn"
+    r"|gi\s+meg\s+et\s+[øo]yeblikk)",
+    re.IGNORECASE,
+)
 _CAPABILITY_TRUTH = (
-    "Jeg kan legge økten rett inn i Intervals for deg – si «ja» eller «legg den inn», "
+    "Jeg kan legge øktene rett inn i Intervals for deg – si «ja» eller «legg dem inn», "
     "så ordner jeg det."
 )
 
 
 def strip_self_denial(text: str) -> str:
-    """Remove sentences where the model wrongly denies it can write to Intervals.
+    """Remove lines where the model wrongly denies its abilities or falsely
+    claims it is performing the write right now.
 
-    The coach can create calendar events via the API, so a reply must never tell
-    William that it cannot, or that he must do it manually. If stripping leaves
-    nothing meaningful, fall back to the truthful capability line.
+    The coach can create calendar events and attach charts, so a reply must
+    never say it cannot, tell William to do it manually, or pretend it already
+    saved something. If stripping leaves nothing meaningful, fall back to the
+    truthful capability line; otherwise make sure the real affordance is shown.
     """
     if not text:
         return text
-    kept = [ln for ln in text.splitlines() if not _SELF_DENIAL.search(ln)]
+    kept: list[str] = []
+    stripped_any = False
+    for ln in text.splitlines():
+        if _SELF_DENIAL.search(ln) or _FALSE_ACTION.search(ln):
+            stripped_any = True
+            continue
+        kept.append(ln)
     out = "\n".join(kept).strip()
     if len(out) < 15:
         return _CAPABILITY_TRUTH
+    if stripped_any and "legg" not in out.lower() and _CAPABILITY_TRUTH not in out:
+        out = f"{out}\n\n{_CAPABILITY_TRUTH}"
     return out
 
 
