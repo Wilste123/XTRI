@@ -56,3 +56,17 @@ Kommaseparert for flere.
 
 - `/status` → svar innen ~30 s (LLM)
 - Tom plan i Intervals → bot skal si at plan mangler, ikke finne på økt
+
+## 8. @mention vs slash (V1)
+
+**Lofoten coach-bot svarer ikke på `@XTRI Coach` eller vanlige kanalmeldinger.** Koden har kun slash-kommandoer (`/status`, `/imorgen`, `/ukestatus`).
+
+Bruk f.eks.:
+
+```
+/status
+```
+
+Forutsetninger samme som over: bot kjører lokalt, **cloudflared** peker på port 3000, slash **Request URL** = `https://<tunnel>/slack/events`, bot invitert i kanalen (`/invite @XTRI Coach`).
+
+Dette er **ikke** Cursor-agenten i Slack – det er en egen app som må kjøre på Macen din mens du tester.
