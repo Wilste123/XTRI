@@ -14,17 +14,59 @@ class Intent(str, Enum):
     RACE = "race"
     LOG = "log"
     GENERAL = "general"
+    ANALYSIS = "analysis"
+    SYNC_WEEK = "sync_week"
+    CHART = "chart"
 
 
 _LOG_PREFIX = re.compile(r"^\s*logg\s*[:]\s*", re.IGNORECASE)
 
 
-def detect_intent(message: str) -> Intent:
+def is_follow_up(message: str, has_history: bool) -> bool:
+    if not has_history:
+        return False
+    text = (message or "").strip()
+    if len(text) > 120:
+        return False
+    lower = text.lower()
+    if any(k in lower for k in ("status", "ukestatus", "i morgen", "logg:")):
+        return False
+    return True
+
+
+def detect_intent(message: str, has_history: bool = False) -> Intent:
     text = (message or "").strip()
     lower = text.lower()
 
+    if is_follow_up(message, has_history):
+        return Intent.GENERAL
+
     if _LOG_PREFIX.match(text) or lower.startswith("logg "):
         return Intent.LOG
+
+    if lower.startswith("briefing:"):
+        return Intent.GENERAL
+
+    if lower in ("nullstill", "reset", "ny samtale"):
+        return Intent.GENERAL
+
+    if any(k in lower for k in ("graf", "chart", "visualiser")):
+        return Intent.CHART
+
+    if any(k in lower for k in ("analyse", "advanced", "dybde", "acwr")):
+        return Intent.ANALYSIS
+
+    if any(
+        k in lower
+        for k in (
+            "legg inn uke",
+            "synk kalender",
+            "synk uke",
+            "ukeplan intervals",
+            "legg uke",
+        )
+    ):
+        return Intent.SYNC_WEEK
 
     if any(
         k in lower

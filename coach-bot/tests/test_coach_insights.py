@@ -36,3 +36,16 @@ def test_coach_brief_contains_days_to_race():
     assert "COACH_BRIEF" in brief
     assert "Dager til Lofoten" in brief
     assert "CTL=20" in brief
+
+
+def test_coach_brief_advanced_section():
+    acts = load_activities()
+    snap = build_training_snapshot(acts, as_of=date(2026, 9, 18))
+    brief = build_coach_brief(
+        snap,
+        {"events": [], "wellness": [{"ctl": 20, "atl": 25}], "activities": acts},
+        "baseline ikke fullført",
+        include_advanced=True,
+    )
+    assert "ADVANCED" in brief
+    assert "ACWR" in brief

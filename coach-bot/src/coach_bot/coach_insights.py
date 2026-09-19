@@ -8,7 +8,12 @@ from typing import Any
 
 from coach_bot.aggregates import (
     TrainingSnapshot,
+    acwr_from_wellness,
+    consistency_stats,
+    discipline_balance_pct,
     format_hours_table,
+    intensity_load_per_hour,
+    plan_adherence,
     plan_vs_actual,
     summarize_wellness_trends,
 )
@@ -99,12 +104,53 @@ def _next_step(week: WeekPlanRef, snapshot: TrainingSnapshot, pva: Any) -> str:
     return f"Fortsett {week.label}; hold volum innen {week.hours_min:.0f}–{week.hours_max:.0f} t denne uken."
 
 
+def _advanced_section(
+    snapshot: TrainingSnapshot,
+    bundle: dict[str, Any],
+    start_week: date,
+    today: date,
+    phase: str,
+) -> list[str]:
+    lines: list[str] = []
+    wellness = bundle.get("wellness") or []
+    acwr = acwr_from_wellness(wellness)
+    if acwr is not None:
+        flag = ""
+        if acwr > 1.5:
+            flag = " (høy – vurder roligere)"
+        elif acwr < 0.8:
+            flag = " (lav – rom for mer)"
+        lines.append(f"- ACWR (ATL/CTL): {acwr}{flag}")
+    bal = discipline_balance_pct(snapshot.last_7_days)
+    if bal:
+        parts = [f"{k} {v}%" for k, v in sorted(bal.items())]
+        lines.append(f"- Disiplinbalanse 7d: {', '.join(parts)}")
+    cons = consistency_stats(bundle.get("activities") or [], today)
+    lines.append(
+        f"- Konsistens ({cons['activity_days']} treningsdager/28d): "
+        f"~{cons['sessions_per_week']} dager/uke, streak {cons['current_streak_days']}d, "
+        f"lengste pause {cons['longest_rest_gap_days']}d"
+    )
+    adh = plan_adherence(bundle.get("events") or [], bundle.get("activities") or [], start_week, today)
+    if adh["planned_days"] > 0:
+        lines.append(
+            f"- Plan adherence: {adh['matched_days']}/{adh['planned_days']} planlagte dager med loggede økt"
+        )
+    tss_h = intensity_load_per_hour(bundle.get("activities") or [], start_week, today)
+    if tss_h is not None:
+        lines.append(f"- TSS/time (uke): {tss_h}")
+    weeks_to_race = max(0, (RACE_DATE - today).days // 7)
+    lines.append(f"- Race countdown: {weeks_to_race} uker til 20. aug 2027 · fase {phase}")
+    return lines
+
+
 def build_coach_brief(
     snapshot: TrainingSnapshot,
     bundle: dict[str, Any],
     current_status_text: str,
     week_override: str | None = None,
     phase: str = "Base_0",
+    include_advanced: bool = False,
 ) -> str:
     today = snapshot.as_of
     days_to_race = (RACE_DATE - today).days
@@ -146,6 +192,11 @@ def build_coach_brief(
     else:
         lines.append("- Risiko: ingen automatiske flagg (sjekk subjektivt)")
     lines.append(f"- Neste steg (anbefalt): {next_step}")
+    if include_advanced:
+        lines.append("")
+        lines.append("### ADVANCED (deterministisk)")
+        for row in _advanced_section(snapshot, bundle, start_week, today, phase):
+            lines.append(row)
     lines.append("")
     lines.append("### Gjennomført (detalj)")
     lines.append(format_hours_table(snapshot.last_7_days))

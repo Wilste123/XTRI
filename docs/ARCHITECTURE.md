@@ -54,7 +54,14 @@ Transport: **Slack Socket Mode**. Health HTTP på port 3000.
 
 Se [DEPLOY.md](DEPLOY.md) – Docker/Fly med `LOFOTEN-2027` baked in.
 
+## V2 (implementert)
+
+- Proaktiv DM + `briefing: test|morgen|uke`
+- Block Kit, matplotlib-grafer, multi-turn chat (`SessionStore` → OpenAI messages)
+- COACH_BRIEF ADVANCED (ACWR, adherence, konsistens)
+- Intervals write: uke-preview + `ja`, enkeltøkt auto (`intervals_planner` + bulk upsert)
+- `POST /admin/briefing` med `X-Admin-Secret`
+
 ## Senere
 
-- Godkjent planendring → Intervals events
 - Web-UI

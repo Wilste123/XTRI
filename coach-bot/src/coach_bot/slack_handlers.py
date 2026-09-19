@@ -12,7 +12,9 @@ from slack_sdk import WebClient
 
 from coach_bot.config import Settings
 from coach_bot.errors import friendly_coach_error
+from coach_bot.coach_reply import CoachReply
 from coach_bot.orchestrator import CoachOrchestrator
+from coach_bot.slack_post import post_coach_reply
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +32,11 @@ def _run_in_thread(
     client: WebClient,
     channel: str,
     thread_ts: str | None,
-    fn: Callable[[], str],
+    fn: Callable[[], CoachReply],
 ) -> None:
     try:
         result = fn()
-        client.chat_postMessage(
-            channel=channel,
-            text=result,
-            thread_ts=thread_ts,
-        )
+        post_coach_reply(client, channel, result, thread_ts=thread_ts)
     except Exception as e:
         logger.exception("Coach DM failed")
         client.chat_postMessage(
@@ -108,7 +106,7 @@ def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Setti
         except Exception:
             pass
 
-        def work() -> str:
+        def work() -> CoachReply:
             return orchestrator.run_chat(text, user_id=user_id)
 
         threading.Thread(
