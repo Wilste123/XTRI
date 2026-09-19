@@ -16,7 +16,7 @@
    ```
 4. Del aldri nøkkelen i chat eller git.
 
-## Kalenderplan (viktig for `/imorgen`)
+## Kalenderplan (viktig for «hva i morgen?» i DM)
 
 Plan i Intervals er **source of truth** i V1.
 
