@@ -71,6 +71,17 @@ def main() -> None:
     register_handlers(bolt, orchestrator, settings)
 
     slack_client = WebClient(token=settings.slack_bot_token)
+    try:
+        auth = slack_client.auth_test()
+        logger.info(
+            "Slack bot connected: user_id=%s user=%s team=%s",
+            auth.get("user_id"),
+            auth.get("user"),
+            auth.get("team"),
+        )
+    except Exception as e:
+        logger.error("Slack auth_test failed – sjekk SLACK_BOT_TOKEN: %s", e)
+
     start_morning_scheduler(settings, slack_client, orchestrator)
 
     health_app = create_health_app(intervals, repo)

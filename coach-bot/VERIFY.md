@@ -11,6 +11,7 @@
 
 | Handling | Forventet |
 |----------|-----------|
+| DM: `ping` | «Pong – coach-bot er på og mottar DM.» |
 | DM: «hvordan ligger jeg an?» | Norsk status med Intervals + CURRENT_STATUS |
 | DM: «hva i morgen?» | Events fra Intervals eller «plan mangler» |
 | DM: «ukestatus» | Gjennomført, belastning, risiko, neste uke |

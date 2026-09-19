@@ -26,25 +26,31 @@ Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN`.
 
 **Basic Information** → **Signing Secret** → `SLACK_SIGNING_SECRET`.
 
-## 5. Event Subscriptions
+## 5. App Home (Messages-fane)
+
+1. **App Home** → **Messages Tab** → slå **på** (la brukere sende meldinger til appen).
+2. Lagre endringer.
+
+## 6. Event Subscriptions
 
 1. **Event Subscriptions** → Enable.
 2. Under **Subscribe to bot events**, legg til:
    - `message.im` (DM til bot)
+3. **Reinstall to Workspace** etter du legger til events/scopes.
 
 Socket Mode trenger **ikke** Request URL / tunnel.
 
-## 6. Åpne DM med boten
+## 7. Åpne DM med boten
 
 I Slack: **Apps** → Lofoten Coach → **Messages** → skriv første melding.
 
 Sett `ALLOWED_SLACK_USER_IDS` i `.env` (din member ID).
 
-## 7. Intervals plan
+## 8. Intervals plan
 
 Legg **ukentlig plan som events** i intervals.icu. Coach leser disse når du spør om i morgen / uke / plan.
 
-## 8. Start bot
+## 9. Start bot
 
 ```bash
 cd coach-bot
@@ -54,7 +60,7 @@ cp .env.example .env   # fyll inn tokens
 
 `curl http://localhost:3000/ready` – sjekk Intervals + repo.
 
-## 9. Eksempler i DM
+## 10. Eksempler i DM
 
 - «Hvordan ligger jeg an?»
 - «Ukestatus»
@@ -71,3 +77,11 @@ MORNING_BRIEFING_MINUTE=0
 ```
 
 Bot må kjøre på det tidspunktet (lokalt eller sky).
+
+## Feilsøking: ingen svar i DM
+
+1. Terminal: ser du `Slack bot connected` og `Slack event: type=message` når du skriver?
+2. Skriv **`ping`** i DM – skal svare «Pong» uten OpenAI.
+3. `SLACK_BOT_TOKEN` og `SLACK_APP_TOKEN` må være fra **samme** Slack-app.
+4. `ALLOWED_SLACK_USER_IDS` må være din member ID (eller tom for å tillate alle).
+5. Bot-prosessen må kjøre mens du tester (`./scripts/start.sh`).
