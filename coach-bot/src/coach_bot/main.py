@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from pathlib import Path
 
 from flask import Flask, jsonify
 from slack_bolt import App
@@ -16,8 +17,10 @@ from coach_bot.context_builder import ContextBuilder
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.llm_client import OpenAILlmClient
 from coach_bot.orchestrator import CoachOrchestrator
-from coach_bot.proactive import start_morning_scheduler
+from coach_bot.proactive import start_proactive_schedulers
 from coach_bot.repo_reader import RepoReader
+from coach_bot.repo_writer import RepoWriter
+from coach_bot.session_store import SessionStore
 from coach_bot.slack_handlers import register_handlers
 
 logging.basicConfig(level=logging.INFO)
@@ -58,11 +61,17 @@ def main() -> None:
     settings = get_settings()
     os.environ.setdefault("TZ", settings.tz)
 
+    bot_root = Path(__file__).resolve().parent.parent.parent
+    db_path = bot_root / settings.session_db_path
+
     intervals = IntervalsClient(settings)
     repo = RepoReader(settings)
-    context = ContextBuilder(intervals, repo, settings.tz)
+    week_ov = settings.coach_week_override.strip() or None
+    context = ContextBuilder(intervals, repo, settings.tz, week_override=week_ov)
     llm = OpenAILlmClient(settings)
-    orchestrator = CoachOrchestrator(context, llm)
+    sessions = SessionStore(db_path, settings.session_max_turns)
+    repo_writer = RepoWriter(settings)
+    orchestrator = CoachOrchestrator(context, llm, sessions, repo_writer)
 
     bolt = App(
         token=settings.slack_bot_token,
@@ -82,7 +91,7 @@ def main() -> None:
     except Exception as e:
         logger.error("Slack auth_test failed – sjekk SLACK_BOT_TOKEN: %s", e)
 
-    start_morning_scheduler(settings, slack_client, orchestrator)
+    start_proactive_schedulers(settings, slack_client, orchestrator)
 
     health_app = create_health_app(intervals, repo)
     threading.Thread(

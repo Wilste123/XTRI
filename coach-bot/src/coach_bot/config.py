@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     morning_briefing_hour: int = 7
     morning_briefing_minute: int = 0
 
+    weekly_briefing_enabled: bool = False
+    weekly_briefing_weekday: int = 6
+    weekly_briefing_hour: int = 18
+    weekly_briefing_minute: int = 0
+
+    coach_week_override: str = ""
+    session_max_turns: int = 10
+    session_db_path: Path = Path("data/sessions.db")
+
     @field_validator(
         "slack_bot_token",
         "slack_app_token",

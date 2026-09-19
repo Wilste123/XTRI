@@ -4,41 +4,57 @@
 
 | System | Source of truth |
 |--------|-----------------|
-| intervals.icu | Økter, wellness, belastning, kalenderplan (events) |
-| LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, beslutninger, strategi |
+| intervals.icu | Økter, wellness (CTL/ATL), belastning, kalenderplan (events) |
+| LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, ukeplan, beslutninger |
 | Slack DM | Brukergrensesnitt |
-
-Rå økter lagres ikke som masse markdown i repo.
+| coach-bot/data/sessions.db | Kort samtaleminne (lokal/sky) |
 
 ## Flyt
 
 ```mermaid
-flowchart LR
-  SlackDM[Slack DM]
-  Bot[coach_bot]
-  Intervals[intervals.icu API]
-  Repo[LOFOTEN-2027]
+flowchart TB
+  DM[Slack DM]
+  Intent[intent.py]
+  Insights[coach_insights.py]
+  Ctx[ContextBuilder]
   LLM[OpenAI]
-  SlackDM --> Bot
-  Bot --> Intervals
-  Bot --> Repo
-  Bot --> LLM
-  LLM --> Bot
-  Bot --> SlackDM
+  Mem[session_store]
+  DM --> Intent
+  Intent --> Ctx
+  Insights --> Ctx
+  Mem --> LLM
+  Ctx --> LLM
+  LLM --> DM
+  Log[repo_writer] --> Repo[LOFOTEN-2027]
 ```
 
-Transport: **Slack Socket Mode** (ingen tunnel). Valgfri morgen-DM via scheduler.
+Transport: **Slack Socket Mode**. Health HTTP på port 3000.
 
 ## Moduler (coach-bot)
 
-- `IntervalsClient` – activities, events, wellness (cache + parallel fetch)
-- `RepoReader` – les markdown fra disk
-- `ContextBuilder` – kompakt kontekst til LLM (`for_chat`)
-- `CoachOrchestrator` – `run_chat` / `run_morning_briefing`
-- `slack_handlers` – DM `message` events
-- `proactive` – morgenbriefing (valgfritt)
+| Modul | Rolle |
+|-------|--------|
+| `IntervalsClient` | Activities, events, wellness (+ cache) |
+| `aggregates` | Volum, plan_vs_actual, wellness trends |
+| `coach_insights` | **COACH_BRIEF** (deterministisk analyse) |
+| `intent` | Klassifiser DM (status, uke, i morgen, logg, …) |
+| `RepoReader` / `RepoWriter` | Les plan; `logg:` → CURRENT_STATUS |
+| `ContextBuilder` | Intent-trimmet kontekst + COACH_BRIEF |
+| `SessionStore` | SQLite, siste N turner |
+| `CoachOrchestrator` | run_chat, morgen/uke-briefing |
+| `proactive` | APScheduler morgen + søndag uke |
 
-## Senere (ikke i denne builden)
+## DM-kommandoer (naturlig språk)
 
-- `/logg` subjektive notater → repo
-- Godkjent planendring → Intervals/repo
+- Status, ukestatus, i morgen, race/spørsmål, smerte
+- `logg: …` → append under «Kort notat» i CURRENT_STATUS
+- `ping` → connectivity test (uten LLM)
+
+## Deploy
+
+Se [DEPLOY.md](DEPLOY.md) – Docker/Fly med `LOFOTEN-2027` baked in.
+
+## Senere
+
+- Godkjent planendring → Intervals events
+- Web-UI

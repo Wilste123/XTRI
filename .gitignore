@@ -2,6 +2,7 @@
 coach-bot/.venv/
 .venv/
 data/cache/
+coach-bot/data/
 __pycache__/
 *.pyc
 .pytest_cache/

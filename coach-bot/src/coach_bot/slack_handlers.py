@@ -109,7 +109,7 @@ def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Setti
             pass
 
         def work() -> str:
-            return orchestrator.run_chat(text)
+            return orchestrator.run_chat(text, user_id=user_id)
 
         threading.Thread(
             target=_run_in_thread,
