@@ -17,12 +17,23 @@ from coach_bot.intent import (
 )
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.intervals_planner import events_for_active_week, parse_single_workout_request
+from coach_bot.workout_extract import (
+    asks_workout_for_calendar,
+    extract_workout_from_text,
+    is_commit_message,
+    wants_intervals_write,
+)
 from coach_bot.llm_client import LlmClient
 from coach_bot.repo_reader import RepoReader
 from coach_bot.repo_writer import RepoWriter
 from coach_bot.session_store import SessionStore
 from coach_bot.slack_delivery import post_dm
-from coach_bot.slack_format import briefing_blocks, parse_brief_sections, week_preview_blocks
+from coach_bot.slack_format import (
+    briefing_blocks,
+    parse_brief_sections,
+    single_workout_preview_blocks,
+    week_preview_blocks,
+)
 
 
 class CoachOrchestrator:
@@ -87,6 +98,16 @@ class CoachOrchestrator:
             self._remember(user_id, text, confirmed.text)
             return confirmed
 
+        if asks_workout_for_calendar(text):
+            reply = self._propose_workout_for_calendar(text, user_id)
+            self._remember(user_id, text, reply.text)
+            return reply
+
+        write_reply = self._handle_intervals_write_followup(text, user_id)
+        if write_reply:
+            self._remember(user_id, text, write_reply.text)
+            return write_reply
+
         if asks_capabilities(text) or (asks_for_charts(text) and asks_for_plan_sync(text)):
             reply = self._reply_graphics_and_plan(text, user_id)
             self._remember(user_id, text, reply.text)
@@ -139,6 +160,18 @@ class CoachOrchestrator:
             if intent in (Intent.WEEK, Intent.CHART, Intent.ANALYSIS) and not reply.image_paths:
                 reply.text += "\n\n_(Grafer mangler – for lite wellness/øktdata i Intervals.)_"
 
+        if wants_intervals_write(text) and self._sessions and self._intervals:
+            event = extract_workout_from_text(
+                llm_text, as_of=self._intervals.today(), user_hint=text
+            )
+            if event:
+                self._sessions.set_pending(user_id, "intervals_single", {"event": event})
+                reply.text += (
+                    "\n\n---\n*Svar «ja» eller «legg den inn i Intervals»* når du vil opprette den i kalenderen."
+                )
+                extra = single_workout_preview_blocks(event)
+                reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + extra
+
         self._remember(user_id, text, reply.text)
         return reply
 
@@ -185,30 +218,118 @@ class CoachOrchestrator:
                 self._sessions.pop_pending(user_id)
                 return CoachReply(text="Avbrutt – ingen endringer i Intervals.")
             return None
-        if lower not in ("ja", "yes", "legg inn", "ok", "gjør det"):
+        if not is_commit_message(text):
             return None
-        pending = self._sessions.pop_pending(user_id)
+        pending = self._sessions.get_pending(user_id)
         if not pending:
-            return CoachReply(
-                text="Ingen ventende ukeplan å bekrefte. Skriv «synk kalender» eller «legg inn uke i intervals» først."
-            )
-        if not self._intervals:
             return None
+        return self._commit_pending(user_id, pending)
+
+    def _commit_pending(self, user_id: str, pending: tuple[str, object]) -> CoachReply:
+        if not self._intervals or not self._sessions:
+            return CoachReply(text="Intervals-skriving er ikke tilgjengelig.")
+        self._sessions.pop_pending(user_id)
         action_type, payload = pending
-        if action_type != "intervals_week":
+        if action_type == "intervals_single":
+            event = (payload or {}).get("event") if isinstance(payload, dict) else None
+            if not event:
+                return CoachReply(text="Ventende økt mangler data – prøv på nytt.")
+            try:
+                self._intervals.create_event(event)
+                d = (event.get("start_date_local") or "")[:10]
+                name = event.get("name") or "Økt"
+                return CoachReply(
+                    text=f"Lagt inn i Intervals: {d} – {name}. Sjekk kalenderen i appen.",
+                    blocks=single_workout_preview_blocks(event),
+                )
+            except Exception as e:
+                return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+        if action_type == "intervals_week":
+            events = (payload or {}).get("events") or [] if isinstance(payload, dict) else []
+            if len(events) > self._max_bulk_events:
+                return CoachReply(text=f"Maks {self._max_bulk_events} økter per sync – del opp uken.")
+            try:
+                created = self._intervals.bulk_upsert_events(events)
+                n = len(created) if created else len(events)
+                return CoachReply(
+                    text=f"Lagt inn {n} økter i Intervals-kalenderen. Sjekk kalenderen i appen.",
+                    blocks=week_preview_blocks(events),
+                )
+            except Exception as e:
+                return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+        return CoachReply(text="Ukjent ventende handling.")
+
+    def _handle_intervals_write_followup(self, text: str, user_id: str) -> CoachReply | None:
+        if not self._sessions or not self._intervals:
             return None
-        events = payload.get("events") or []
-        if len(events) > self._max_bulk_events:
-            return CoachReply(text=f"Maks {self._max_bulk_events} økter per sync – del opp uken.")
-        try:
-            created = self._intervals.bulk_upsert_events(events)
-            n = len(created) if created else len(events)
+        if not wants_intervals_write(text) and not is_commit_message(text):
+            return None
+
+        pending = self._sessions.get_pending(user_id)
+        if pending and is_commit_message(text):
+            return self._commit_pending(user_id, pending)
+
+        last = self._sessions.last_assistant_message(user_id)
+        if not last:
             return CoachReply(
-                text=f"Lagt inn {n} økter i Intervals-kalenderen. Sjekk kalenderen i appen.",
-                blocks=week_preview_blocks(events),
+                text=(
+                    "Beskriv økten først (f.eks. sykkel 60 min i morgen), eller skriv direkte: "
+                    "`legg inn sykkel 60 min i morgen`."
+                )
             )
-        except Exception as e:
-            return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+        user_hint = text
+        for msg in reversed(self._sessions.get_messages(user_id)):
+            if msg["role"] == "user" and msg["content"].strip() != text.strip():
+                user_hint = msg["content"] + "\n" + user_hint
+                break
+
+        event = extract_workout_from_text(
+            last, as_of=self._intervals.today(), user_hint=user_hint
+        )
+        if not event:
+            return CoachReply(
+                text=(
+                    "Fant ikke nok detaljer i forrige forslag. "
+                    "Prøv: `legg inn sykkel 60 min i morgen`."
+                )
+            )
+
+        self._sessions.set_pending(user_id, "intervals_single", {"event": event})
+        if is_commit_message(text) or wants_intervals_write(text):
+            return self._commit_pending(user_id, ("intervals_single", {"event": event}))
+
+        return CoachReply(
+            text=f"Forhåndsvisning: {event.get('name')} – svar *ja* for å legge inn.",
+            blocks=single_workout_preview_blocks(event),
+        )
+
+    def _propose_workout_for_calendar(self, text: str, user_id: str) -> CoachReply:
+        ctx = self._context.for_chat(text, intent=Intent.TOMORROW)
+        llm_text = self._llm.complete_chat(
+            ctx,
+            text,
+            intent=Intent.TOMORROW,
+            history_messages=self._history_messages(user_id) or None,
+        )
+        today = self._intervals.today() if self._intervals else None
+        event = None
+        if self._intervals and today and self._sessions:
+            event = extract_workout_from_text(llm_text, as_of=today, user_hint=text)
+            if event:
+                self._sessions.set_pending(user_id, "intervals_single", {"event": event})
+
+        reply = self._wrap_llm_reply(llm_text, Intent.TOMORROW, "Plan for i morgen")
+        reply.text += (
+            "\n\n---\n*Svar «ja» eller «legg den inn i Intervals»* for å opprette økten i kalenderen."
+        )
+        if event:
+            reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + single_workout_preview_blocks(
+                event
+            )
+        return reply
 
     def _reply_graphics_and_plan(self, text: str, user_id: str) -> CoachReply:
         """Deterministic answer when user asks for charts + Intervals plan (avoids LLM «kan ikke»)."""

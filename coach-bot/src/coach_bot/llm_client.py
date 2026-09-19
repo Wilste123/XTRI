@@ -17,7 +17,10 @@ _INTENT_HINTS = {
         "Gi LOFOTEN 2027 STATUS basert på COACH_BRIEF – ikke motsi tall der. "
         "Start med én kort setning (hook), deretter punkter."
     ),
-    Intent.TOMORROW: "Fokus på i dag/i morgen fra events; si tydelig hvis plan mangler.",
+    Intent.TOMORROW: (
+        "Fokus på i dag/i morgen. Hvis bruker vil i Intervals: gi konkret øktforslag med "
+        "type, varighet (min/time) og struktur – systemet kan legge inn etter «ja»/«legg den inn»."
+    ),
     Intent.WEEK: (
         "UKESTATUS: gjennomført, belastning, bra/dårlig, risiko, endringer, neste uke. "
         "Kort hook først."

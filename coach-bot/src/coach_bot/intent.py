@@ -25,6 +25,10 @@ _LOG_PREFIX = re.compile(r"^\s*logg\s*[:]\s*", re.IGNORECASE)
 def is_follow_up(message: str, has_history: bool) -> bool:
     if not has_history:
         return False
+    from coach_bot.workout_extract import is_commit_message, wants_intervals_write
+
+    if is_commit_message(message) or wants_intervals_write(message):
+        return False
     text = (message or "").strip()
     if len(text) > 120:
         return False
@@ -55,6 +59,11 @@ def detect_intent(message: str, has_history: bool = False) -> Intent:
 
     if any(k in lower for k in ("analyse", "advanced", "dybde", "acwr")):
         return Intent.ANALYSIS
+
+    from coach_bot.workout_extract import asks_workout_for_calendar
+
+    if asks_workout_for_calendar(text):
+        return Intent.TOMORROW
 
     if asks_for_plan_sync(text) or any(
         k in lower

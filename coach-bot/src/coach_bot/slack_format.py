@@ -35,14 +35,18 @@ def week_preview_blocks(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         d = (ev.get("start_date_local") or "")[:10]
         name = ev.get("name") or "Økt"
         mins = ev.get("planned_duration")
-        dur = f" · {int(mins)} min" if mins else ""
+        dur = f" · {int(mins) // 60} min" if mins else ""
         lines.append(f"• {d}: {name}{dur}")
     body = "\n".join(lines) if lines else "_Ingen økter i forslaget._"
     return briefing_blocks(
         "Forhåndsvisning – Intervals",
-        "Svar *ja* eller *legg inn* for å opprette disse i kalenderen. Svar *avbryt* for å droppe.",
+        "Svar *ja* eller *legg inn* for å opprette i kalenderen. Svar *avbryt* for å droppe.",
         [("Planlagte økter", body)],
     )
+
+
+def single_workout_preview_blocks(event: dict[str, Any]) -> list[dict[str, Any]]:
+    return week_preview_blocks([event])
 
 
 def parse_brief_sections(llm_text: str) -> list[tuple[str, str]]:
