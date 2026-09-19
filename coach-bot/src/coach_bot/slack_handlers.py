@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import re
 import threading
+import time
+from collections import OrderedDict
 from typing import Any, Callable
 
 from slack_bolt import App
@@ -19,6 +21,38 @@ from coach_bot.slack_post import post_coach_reply
 logger = logging.getLogger(__name__)
 
 _ANY_TEXT = re.compile(r".+", re.DOTALL)
+
+
+class RecentEvents:
+    """Thread-safe bounded set of recently handled Slack event keys.
+
+    Slack's Events API delivers at-least-once and retries, so the same DM can
+    arrive more than once and produce duplicate replies. We remember a stable
+    key per message and skip repeats.
+    """
+
+    def __init__(self, capacity: int = 512) -> None:
+        self._capacity = capacity
+        self._seen: "OrderedDict[str, float]" = OrderedDict()
+        self._lock = threading.Lock()
+
+    def seen(self, key: str | None) -> bool:
+        if not key:
+            return False
+        with self._lock:
+            if key in self._seen:
+                return True
+            self._seen[key] = time.time()
+            while len(self._seen) > self._capacity:
+                self._seen.popitem(last=False)
+            return False
+
+
+def event_key(event: dict[str, Any]) -> str | None:
+    """Stable identifier for a Slack message event (dedupe key)."""
+    return event.get("client_msg_id") or (
+        f"{event.get('channel')}:{event.get('ts')}" if event.get("ts") else None
+    )
 
 
 def _is_dm(event: dict[str, Any]) -> bool:
@@ -48,6 +82,7 @@ def _run_in_thread(
 
 def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Settings) -> None:
     allowed = settings.allowed_user_id_set
+    recent = RecentEvents()
 
     def check_user(user_id: str) -> bool:
         if not allowed:
@@ -85,6 +120,11 @@ def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Setti
         if not text:
             return
 
+        # Dropp dupliserte leveranser av samme melding (Slack retries).
+        if recent.seen(event_key(event)):
+            logger.info("Duplicate Slack event ignored key=%s", event_key(event))
+            return
+
         channel = event["channel"]
         # Ikke bruk message ts som thread_ts i vanlig DM – svar kan bli skjult i tråd
         thread_ts = event.get("thread_ts")
@@ -95,7 +135,7 @@ def register_handlers(app: App, orchestrator: CoachOrchestrator, settings: Setti
             say("Pong – coach-bot er på og mottar DM.")
             return
 
-        say("Henter data fra Intervals og repo – et øyeblikk…")
+        say("Gi meg et par sekunder – jeg ser på tallene dine…")
 
         try:
             client.reactions_add(

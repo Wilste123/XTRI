@@ -179,7 +179,9 @@ def test_chat_paths_produce_reply(orch, msg):
     r = orch["orch"].run_chat(msg, user_id="U1")
     assert isinstance(r, CoachReply)
     assert r.text and r.text.strip()
-    assert r.blocks  # Block Kit built from the LLM reply
+    # Coachens egne svar er ren mentor-tekst (ingen «tittelkort»-overskrifter).
+    assert "##" not in r.text
+    assert not r.text.lower().startswith("coach")
 
 
 def test_status_and_week_attach_charts(orch):
@@ -285,3 +287,24 @@ def test_extract_workout_external_id_is_stable():
     b = extract_workout_from_text(_PROPOSAL, as_of=TODAY)
     assert a is not None and b is not None
     assert a["external_id"] == b["external_id"]
+
+
+class DenyingLlm(FakeLlm):
+    """Simulates the model wrongly refusing to write to Intervals."""
+
+    def complete_chat(self, *args, **kwargs) -> str:
+        return (
+            "Beklager misforståelsen. Jeg kan ikke direkte legge inn økten i "
+            "Intervals.icu, men jeg kan gi deg instruksjoner."
+        )
+
+
+def test_reply_never_denies_ability(orch):
+    # Bytt inn en LLM som fornekter evnen, og sjekk at coachen ikke sender det videre.
+    orch["orch"]._llm = DenyingLlm()
+    r = orch["orch"].run_chat("hvordan ligger jeg an?", user_id="U9")
+    low = r.text.lower()
+    assert "kan ikke" not in low
+    assert "beklager misforståelsen" not in low
+    # Skal i stedet tilby å legge inn økten.
+    assert "legg" in low or "ja" in low

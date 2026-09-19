@@ -33,7 +33,7 @@ from coach_bot.repo_reader import RepoReader
 from coach_bot.repo_writer import RepoWriter
 from coach_bot.session_store import SessionStore
 from coach_bot.slack_delivery import post_dm
-from coach_bot.slack_compose import compact_reply, compact_system_message
+from coach_bot.slack_compose import compact_system_message, natural_reply
 from coach_bot.slack_format import single_workout_preview_blocks, week_preview_blocks
 
 
@@ -65,7 +65,9 @@ class CoachOrchestrator:
         return msgs
 
     def _wrap_llm_reply(self, text: str, intent: Intent, title: str) -> CoachReply:
-        return compact_reply(title, text)
+        # Coachens egne svar skal føles som en ekte mentor på DM – ren tekst,
+        # ingen «tittelkort», og aldri en fornektelse av egne evner.
+        return natural_reply(text)
 
     def _attach_charts(self, reply: CoachReply, bundle: dict, as_of) -> CoachReply:
         paths = []
