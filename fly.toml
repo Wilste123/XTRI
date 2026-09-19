@@ -1,11 +1,11 @@
-# fly.toml – prefer repo root fly.toml (app `xtri`). Legacy path:
-#   fly deploy --config coach-bot/fly.toml   # only if cwd is repo root
+# Deploy from repository root: cd /Users/william/XTRI && fly deploy
+# Do not run fly launch from coach-bot/ alone — Docker COPY needs LOFOTEN-2027/
 
 app = 'xtri'
 primary_region = 'ams'
 
 [build]
-  dockerfile = '../Dockerfile'
+  dockerfile = 'Dockerfile'
 
 [env]
   PORT = '8080'

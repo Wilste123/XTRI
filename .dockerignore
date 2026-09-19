@@ -1,0 +1,11 @@
+.git
+.github
+**/.venv
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/.env
+coach-bot/data
+**/.venv-test
+*.md
+!coach-bot/README.md
