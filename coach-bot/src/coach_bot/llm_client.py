@@ -14,26 +14,26 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _INTENT_HINTS = {
     Intent.STATUS: (
-        "Gi LOFOTEN 2027 STATUS fra COACH_BRIEF – ikke motsi tall. "
-        "Kort hook, maks 3 korte linjer, avslutt med Neste: … Ingen # overskrifter."
+        "Gi William en ærlig følelse av hvor han står, forankret i COACH_BRIEF: hva som er "
+        "bra, hva han bør passe på. Naturlig prosa som en mentor – ingen overskrifter eller maler."
     ),
     Intent.TOMORROW: (
-        "Fokus på i dag/i morgen. Hvis bruker vil i Intervals: gi konkret øktforslag med "
-        "type, varighet (min/time) og struktur – systemet kan legge inn etter «ja»/«legg den inn»."
+        "Snakk om i dag/i morgen. Foreslå én konkret økt (type, varighet, struktur) han kan si "
+        "ja til – du legger den inn i Intervals etterpå. Aldri be ham gjøre det manuelt."
     ),
     Intent.WEEK: (
-        "UKESTATUS fra COACH_BRIEF: kort hook, maks 3 linjer med fakta, Neste: … "
-        "Ingen # overskrifter eller lange lister."
+        "Oppsummer uken som en coach: gjennomført, belastning, hva som gikk bra/dårlig, og hva "
+        "neste uke bør handle om. Bruk tallene i COACH_BRIEF, naturlig prosa."
     ),
-    Intent.PAIN: "Ikke diagnostiser; vurder belastning fra data og anbefal lege ved behov.",
-    Intent.RACE: "Race-strategi Lofoten Half Extreme; ikke Norseman-volum.",
-    Intent.LOG: "Bekreft notat.",
-    Intent.GENERAL: "Svar konkret; bruk COACH_BRIEF for tall. Dialog – referer til tidligere i tråden.",
-    Intent.ANALYSIS: "Forklar ADVANCED-seksjonen i COACH_BRIEF med klare anbefalinger.",
-    Intent.SYNC_WEEK: "Hjelp med kalender-sync; ikke finn på at økter er lagt inn uten bekreftelse.",
+    Intent.PAIN: "Ta smerten på alvor uten å diagnostisere. Vurder belastningen fra dataene, foreslå justering, anbefal fagperson ved behov.",
+    Intent.RACE: "Snakk race-strategi for Lofoten Half Extreme (ikke Norseman-volum). Konkret og jordnær.",
+    Intent.LOG: "Bekreft kort og menneskelig at du har notert det.",
+    Intent.GENERAL: "Vanlig samtale. Svar konkret, referer til det dere har snakket om, bruk COACH_BRIEF for tall.",
+    Intent.ANALYSIS: "Gå litt dypere på ADVANCED-tallene i COACH_BRIEF og hva de betyr – forklar som en mentor, ikke som en rapport.",
+    Intent.SYNC_WEEK: "Hjelp med kalender-sync; aldri påstå at økter er lagt inn før det er bekreftet.",
     Intent.CHART: (
-        "Graf-bilder (CTL/ATL, disiplinvolum) legges ved denne Slack-meldingen automatisk. "
-        "Forklar kort hva de viser; aldri si at du ikke kan lage grafer."
+        "Grafene (CTL/ATL, disiplinvolum) legges ved denne meldingen automatisk. "
+        "Kommenter kort hva de forteller; aldri si at du ikke kan lage grafer."
     ),
 }
 
