@@ -28,4 +28,6 @@ def test_search_empty_query_returns_nothing():
 
 def test_search_text_renders_source():
     txt = knowledge.search_text("aerob base sone 2", top_k=1)
-    assert "trening" in txt
+    # Rendres med kildemerke [<source>] og relevant innhold.
+    assert txt.startswith("[")
+    assert "aerob" in txt.lower() or "sone" in txt.lower()
