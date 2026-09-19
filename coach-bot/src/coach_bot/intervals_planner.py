@@ -24,7 +24,9 @@ _SPORT_MAP = {
     "løp": "Run",
     "lop": "Run",
     "run": "Run",
+    "jogg": "Run",
     "sykkel": "Ride",
+    "sykl": "Ride",
     "bike": "Ride",
     "ride": "Ride",
     "svøm": "Swim",
@@ -33,6 +35,7 @@ _SPORT_MAP = {
     "styrke": "Workout",
     "strength": "Workout",
     "walk": "Walk",
+    "gåtur": "Walk",
 }
 
 
@@ -107,21 +110,53 @@ def events_for_active_week(repo: RepoReader, as_of: date | None = None) -> list[
     return parse_week_plan_table(md, week_start)
 
 
+def _parse_minutes_message(lower: str) -> int:
+    m = re.search(r"(\d+)\s*min", lower)
+    if m:
+        return int(m.group(1))
+    if re.search(r"\b1\s*time\b", lower):
+        return 60
+    m = re.search(r"(\d+)\s*time", lower)
+    if m:
+        return int(m.group(1)) * 60
+    m = re.search(r"(\d+)\s*h\b", lower)
+    if m:
+        return int(m.group(1)) * 60
+    return 45
+
+
 def parse_single_workout_request(message: str, as_of: date) -> dict[str, Any] | None:
-    """e.g. legg inn løp 45 min på tirsdag"""
+    """e.g. legg inn løp 45 min på tirsdag / legge inn sykkel 60 min i morgen"""
     lower = message.lower()
-    if not any(k in lower for k in ("legg inn", "legg til", "opprett", "ny økt")):
+    triggers = (
+        "legg inn",
+        "legge inn",
+        "legg til",
+        "opprett",
+        "ny økt",
+    )
+    if not any(k in lower for k in triggers):
         return None
-    mins_m = re.search(r"(\d+)\s*min", lower)
-    mins = int(mins_m.group(1)) if mins_m else 45
+    # Krev en eksplisitt idrett i selve meldingen, ellers er dette en
+    # oppfølging som refererer til et tidligere forslag (håndteres et annet sted).
+    if not any(k in lower for k in _SPORT_MAP):
+        return None
+    mins = _parse_minutes_message(lower)
     target = as_of
-    for key, off in _DAY_MAP.items():
-        if key in lower:
-            mon = _monday_of_week(as_of)
-            target = mon + timedelta(days=off)
-            if off < as_of.weekday() and "neste" not in lower:
-                target = target + timedelta(days=7)
-            break
+    if "i morgen" in lower or "imorgen" in lower:
+        target = as_of + timedelta(days=1)
+    else:
+        iso = re.search(r"(\d{4}-\d{2}-\d{2})", message)
+        if iso:
+            target = date.fromisoformat(iso.group(1))
+        else:
+            for key, off in _DAY_MAP.items():
+                if key in lower:
+                    mon = _monday_of_week(as_of)
+                    target = mon + timedelta(days=off)
+                    if off < as_of.weekday() and "neste" not in lower:
+                        target = target + timedelta(days=7)
+                    break
     sport = _detect_type(lower)
     name = "Coach-økt"
     if "løp" in lower or "lop" in lower:

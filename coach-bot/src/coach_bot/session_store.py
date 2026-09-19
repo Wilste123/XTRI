@@ -117,3 +117,25 @@ class SessionStore:
                 (user_id,),
             ).fetchone()
         return row is not None
+
+    def get_pending(self, user_id: str) -> tuple[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT action_type, payload_json FROM pending_actions WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return row["action_type"], json.loads(row["payload_json"])
+
+    def last_assistant_message(self, user_id: str) -> str | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT content FROM turns
+                WHERE user_id = ? AND role = 'assistant'
+                ORDER BY id DESC LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone()
+        return row["content"] if row else None

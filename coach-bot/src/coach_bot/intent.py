@@ -25,6 +25,10 @@ _LOG_PREFIX = re.compile(r"^\s*logg\s*[:]\s*", re.IGNORECASE)
 def is_follow_up(message: str, has_history: bool) -> bool:
     if not has_history:
         return False
+    from coach_bot.workout_extract import is_commit_message, wants_intervals_write
+
+    if is_commit_message(message) or wants_intervals_write(message):
+        return False
     text = (message or "").strip()
     if len(text) > 120:
         return False
@@ -50,13 +54,18 @@ def detect_intent(message: str, has_history: bool = False) -> Intent:
     if lower in ("nullstill", "reset", "ny samtale"):
         return Intent.GENERAL
 
-    if any(k in lower for k in ("graf", "chart", "visualiser")):
+    if asks_for_charts(text):
         return Intent.CHART
 
     if any(k in lower for k in ("analyse", "advanced", "dybde", "acwr")):
         return Intent.ANALYSIS
 
-    if any(
+    from coach_bot.workout_extract import asks_workout_for_calendar
+
+    if asks_workout_for_calendar(text):
+        return Intent.TOMORROW
+
+    if asks_for_plan_sync(text) or any(
         k in lower
         for k in (
             "legg inn uke",
@@ -128,3 +137,85 @@ def detect_intent(message: str, has_history: bool = False) -> Intent:
 
 def strip_log_prefix(message: str) -> str:
     return _LOG_PREFIX.sub("", message.strip()).strip()
+
+
+def asks_for_charts(message: str) -> bool:
+    lower = (message or "").lower()
+    return any(
+        k in lower
+        for k in (
+            "graf",
+            "chart",
+            "visualiser",
+            "visuell",
+            "visuelt",
+            "figur",
+            "plot",
+            "diagram",
+            "kurve",
+            "tidslinje",
+            "illustrasjon",
+            "fremstilling",
+        )
+    )
+
+
+def asks_for_plan_sync(message: str) -> bool:
+    lower = (message or "").lower()
+    plan_words = (
+        "treningsplan",
+        "treingsplan",
+        "ukeplan",
+        "treningsplaner",
+        "kalender",
+        "intervals",
+    )
+    action_words = (
+        "legg inn",
+        "legge inn",
+        "legg til",
+        "synk",
+        "synke",
+        "opprett",
+        "lage",
+        "kan du",
+        "putt",
+        "importer",
+    )
+    week_phrases = (
+        "ukeplanen",
+        "legg inn planen",
+        "legge inn planen",
+        "hele uken",
+        "treningsplanen",
+        "ukeplan",
+        "synk kalender",
+        "synk uke",
+    )
+    if any(p in lower for p in week_phrases) and any(
+        a in lower for a in action_words + ("plan", "uke", "kalender", "intervals", "intervalls")
+    ):
+        return True
+    return any(p in lower for p in plan_words) and any(a in lower for a in action_words)
+
+
+def wants_week_plan_write(message: str) -> bool:
+    """User wants full week plan in Intervals (not single workout follow-up)."""
+    lower = (message or "").lower()
+    if asks_for_plan_sync(message):
+        return True
+    if any(w in lower for w in ("ukeplanen", "treningsplanen", "hele uken", "synk kalender")):
+        return "interval" in lower or "legg" in lower or "legge" in lower or "synk" in lower
+    return False
+
+
+def asks_capabilities(message: str) -> bool:
+    """Natural questions like «kan du lage grafer og legge inn plan?»"""
+    lower = (message or "").lower()
+    if asks_for_charts(message) and asks_for_plan_sync(message):
+        return True
+    if "kan du" in lower and asks_for_charts(message):
+        return True
+    if "kan du" in lower and any(p in lower for p in ("treningsplan", "ukeplan", "kalender")):
+        return True
+    return False
