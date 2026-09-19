@@ -52,3 +52,22 @@ Nyere `scripts/start.sh` setter dette automatisk via `certifi` (transitiv avheng
 ```bash
 python -c "import urllib.request; urllib.request.urlopen('https://slack.com'); print('SSL ok')"
 ```
+
+## Feilsøking: `account_inactive` / `token is invalid`
+
+SSL fungerer, men `auth.test` svarer `account_inactive`. Da er **`SLACK_BOT_TOKEN` ugyldig** for workspace (gammel token, app avinstallert, feil app, eller kopiert App Token i stedet for Bot Token).
+
+1. [api.slack.com/apps](https://api.slack.com/apps) → velg **Lofoten Coach** (eller opprett app på nytt).
+2. **OAuth & Permissions** → **Reinstall to Workspace** (eller Install App).
+3. Kopier **Bot User OAuth Token** (`xoxb-...`) – ikke App-Level Token (`xapp-...`).
+4. Lim inn i `coach-bot/.env` som `SLACK_BOT_TOKEN=...` (ingen anførselstegn, ingen mellomrom).
+5. Hvis ny app: oppdater også `SLACK_SIGNING_SECRET` under Basic Information.
+6. Start bot på nytt.
+
+Test token (bytt ut token):
+
+```bash
+curl -s -H "Authorization: Bearer xoxb-DIN-TOKEN" https://slack.com/api/auth.test | python3 -m json.tool
+```
+
+Forventet: `"ok": true`. Ved `account_inactive` → reinstall og ny `xoxb-` token.
