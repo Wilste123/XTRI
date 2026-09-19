@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     )
 
     slack_bot_token: str
+    slack_app_token: str
     slack_signing_secret: str
     allowed_slack_user_ids: str = ""
 
@@ -27,6 +28,28 @@ class Settings(BaseSettings):
 
     port: int = 3000
     tz: str = "Europe/Oslo"
+
+    intervals_cache_ttl_seconds: int = 180
+
+    morning_briefing_enabled: bool = False
+    morning_briefing_hour: int = 7
+    morning_briefing_minute: int = 0
+
+    @field_validator(
+        "slack_bot_token",
+        "slack_app_token",
+        "slack_signing_secret",
+        "intervals_athlete_id",
+        "intervals_api_key",
+        "openai_api_key",
+        "allowed_slack_user_ids",
+        mode="before",
+    )
+    @classmethod
+    def _strip_strings(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
     @property
     def lofoten_dir(self) -> Path:

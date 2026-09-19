@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -10,12 +13,18 @@ import httpx
 
 from coach_bot.config import Settings
 
+logger = logging.getLogger(__name__)
+
 
 class IntervalsClient:
     def __init__(self, settings: Settings) -> None:
         self._athlete_id = settings.intervals_athlete_id
         self._base = settings.intervals_base_url.rstrip("/")
         self._tz = settings.tz
+        self._cache_ttl = settings.intervals_cache_ttl_seconds
+        self._cache_key: tuple[int, date] | None = None
+        self._cache_at: float = 0.0
+        self._cache_bundle: dict[str, Any] | None = None
         self._client = httpx.Client(
             base_url=self._base,
             auth=("API_KEY", settings.intervals_api_key),
@@ -81,21 +90,48 @@ class IntervalsClient:
             return data
         return data.get("wellness") or data.get("data") or []
 
+    def ping(self) -> None:
+        """Lightweight auth check."""
+        today = self.today()
+        self.get_activities(today, today)
+
     def today(self) -> date:
         return datetime.now(ZoneInfo(self._tz)).date()
 
-    def fetch_coach_bundle(self, activity_days: int = 28) -> dict[str, Any]:
+    def _fetch_bundle_uncached(self, activity_days: int) -> dict[str, Any]:
         today = self.today()
         oldest_act = today - timedelta(days=activity_days - 1)
         oldest_ev = today - timedelta(days=14)
         newest_ev = today + timedelta(days=14)
+        wellness_oldest = today - timedelta(days=27)
 
-        activities = self.get_activities(oldest_act, today)
-        events = self.get_events(oldest_ev, newest_ev)
-        wellness = self.get_wellness(today - timedelta(days=27), today)
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_act = pool.submit(self.get_activities, oldest_act, today)
+            f_ev = pool.submit(self.get_events, oldest_ev, newest_ev)
+            f_well = pool.submit(self.get_wellness, wellness_oldest, today)
+            activities = f_act.result()
+            events = f_ev.result()
+            wellness = f_well.result()
 
         return {
             "activities": activities,
             "events": events,
             "wellness": wellness,
         }
+
+    def fetch_coach_bundle(self, activity_days: int = 28) -> dict[str, Any]:
+        today = self.today()
+        key = (activity_days, today)
+        now = time.monotonic()
+        if (
+            self._cache_bundle is not None
+            and self._cache_key == key
+            and (now - self._cache_at) < self._cache_ttl
+        ):
+            return self._cache_bundle
+
+        bundle = self._fetch_bundle_uncached(activity_days)
+        self._cache_key = key
+        self._cache_at = now
+        self._cache_bundle = bundle
+        return bundle

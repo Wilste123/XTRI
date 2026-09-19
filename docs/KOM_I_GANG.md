@@ -1,82 +1,62 @@
-# Kom i gang – Lofoten 2027 + AI Coach
+# Kom i gang – Lofoten 2027 + AI Coach (DM)
 
 **Sist oppdatert:** 2026-09-19  
-Bruk denne som hoved-sjekkliste. Kryss av når du er ferdig (rediger filen eller husk mentalt).
-
-**Git:** `main` synket med [github.com/Wilste123/XTRI](https://github.com/Wilste123/XTRI).
+Én sjekkliste fra null til coach i Slack-DM.
 
 ---
 
-## Fase 0 – Prosjekt sikret
+## 1 – Intervals.icu
 
-- [x] Remote `origin` og push (ferdig)
-- [x] `.gitignore` dekker `.env` og `.venv`
+- [ ] Klokke/sykkel synker til [intervals.icu](https://intervals.icu)
+- [ ] Athlete ID + API key i `coach-bot/.env`
+- [ ] **Kalender:** gro plan for **denne + neste uke** som events
+- [ ] (Anbefalt) Wellness når du kan
 
----
-
-## Fase 1 – Intervals.icu
-
-- [ ] Klokke/sykkel/Strava synker til [intervals.icu](https://intervals.icu)
-- [ ] Athlete ID notert (Settings, f.eks. `i123456`)
-- [ ] API key opprettet (Settings → Developer)
-- [ ] `coach-bot/.env`: `INTERVALS_ATHLETE_ID` + `INTERVALS_API_KEY`
-- [ ] **Kalender:** gro plan for **denne + neste uke** som events (tittel, type, varighet)
-- [ ] (Anbefalt) Wellness: søvn/HRV/vekt når du kan
+Detaljer: [INTERVALS_QUICKSTART.md](INTERVALS_QUICKSTART.md)
 
 ---
 
-## Fase 2 – OpenAI
+## 2 – OpenAI
 
-- [ ] API-nøkkel fra [platform.openai.com](https://platform.openai.com)
 - [ ] `OPENAI_API_KEY` i `coach-bot/.env`
-- [ ] `COACH_MODEL=gpt-4o-mini` (standard)
+- [ ] `COACH_MODEL=gpt-4o-mini`
 
 ---
 
-## Fase 3 – Slack + bot
+## 3 – Slack (DM, Socket Mode)
 
-Se også [SLACK_SETUP.md](SLACK_SETUP.md).
+- [ ] Følg [SLACK_SETUP.md](SLACK_SETUP.md) (Socket Mode, scopes, `message.im`)
+- [ ] `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNING_SECRET`, `ALLOWED_SLACK_USER_IDS`
+- [ ] `REPO_ROOT` = absolutt sti til dette repoet
+- [ ] `cp coach-bot/.env.example coach-bot/.env` – **commit aldri `.env`**
+- [ ] `./coach-bot/scripts/start.sh`
+- [ ] `curl http://localhost:3000/ready`
+- [ ] Åpne DM med appen og skriv f.eks. «status»
 
-- [ ] Slack-app opprettet (`chat:write`, `commands`)
-- [ ] `SLACK_BOT_TOKEN` + `SLACK_SIGNING_SECRET` i `.env`
-- [ ] Slash: `/status`, `/imorgen`, `/ukestatus` → `https://<tunnel>/slack/events`
-- [ ] `ALLOWED_SLACK_USER_IDS` = din Slack member ID
-- [ ] `REPO_ROOT=/Users/william/XTRI` i `.env`
-- [ ] Start bot: `./coach-bot/scripts/start.sh` (eller se script)
-- [ ] Tunnel: `cloudflared tunnel --url http://localhost:3000`
-- [ ] `curl http://localhost:3000/health` → ok
-- [ ] Test `/status` i Slack (15–30 s)
+Env-sjekkliste: [coach-bot/SETUP_ENV.md](../coach-bot/SETUP_ENV.md)
 
 ---
 
-## Fase 4 – Prosjektminne
+## 4 – Prosjektminne
 
-- [ ] [CURRENT_STATUS.md](../LOFOTEN-2027/CURRENT_STATUS.md) fylt ut
-- [ ] [08_UTSTYR.md](../LOFOTEN-2027/08_UTSTYR.md) fylt ut
-
----
-
-## Fase 5 – Trening
-
-- [ ] Les [baseline-uke.md](../LOFOTEN-2027/ukeplan/baseline-uke.md) og start når klar
-- [ ] Testdager gjennomført (tir/ons/fre)
-- [ ] [06_TESTRESULTATER.md](../LOFOTEN-2027/06_TESTRESULTATER.md) utfylt
-- [ ] Oppdater CURRENT_STATUS + 03 etter baseline
-- [ ] Uke 01–04 + speil gro plan i Intervals
+- [ ] [LOFOTEN-2027/CURRENT_STATUS.md](../LOFOTEN-2027/CURRENT_STATUS.md)
+- [ ] [08_UTSTYR.md](../LOFOTEN-2027/08_UTSTYR.md)
 
 ---
 
-## Fase 6 – Ukentlig ritual
+## 5 – Trening
 
-Se [WEEKLY_RITUAL.md](WEEKLY_RITUAL.md).
-
-- [ ] Søndag: `/ukestatus` → oppdater CURRENT_STATUS + Intervals neste uke
+- [ ] [baseline-uke.md](../LOFOTEN-2027/ukeplan/baseline-uke.md)
+- [ ] [06_TESTRESULTATER.md](../LOFOTEN-2027/06_TESTRESULTATER.md) etter tester
 
 ---
 
-## Minimum viable uke 1
+## 6 – Ukentlig
 
-1. Intervals synker + events i kalender  
-2. `.env` + bot + tunnel + én `/status`  
-3. CURRENT_STATUS oppdatert  
-4. Baseline-uke startet  
+[WEEKLY_RITUAL.md](WEEKLY_RITUAL.md) – DM «ukestatus», oppdater CURRENT_STATUS og Intervals.
+
+---
+
+## Nøkler lekket?
+
+Hvis `.env` har vært i git: roter Slack-, Intervals- og OpenAI-nøkler. Se SETUP_ENV.

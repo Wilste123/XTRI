@@ -1,4 +1,4 @@
-"""LLM abstraction – OpenAI in V1."""
+"""LLM abstraction – OpenAI."""
 
 from __future__ import annotations
 
@@ -16,10 +16,21 @@ def load_system_prompt() -> str:
     path = _PROMPTS_DIR / "system.md"
     return path.read_text(encoding="utf-8")
 
+_CHAT_INSTRUCTION = """
+Brukeren skriver i Slack DM. Tolk intensjon fra meldingen (status, ukestatus, plan i morgen, fri sparring).
+
+Struktur når det passer:
+- **Status / form:** LOFOTEN 2027 STATUS – tid til race, volum, disipliner, risiko, fokus 2–4 uker.
+- **Uke:** Gjennomført, belastning, bra/dårlig, risiko, endringer, neste uke.
+- **I morgen / i dag:** plan fra events + anbefaling; si tydelig hvis plan mangler.
+
+Svar kort når spørsmålet er enkelt; utdyp når brukeren ber om analyse.
+"""
+
 
 class LlmClient(ABC):
     @abstractmethod
-    def complete(self, user_message: str, command_hint: str) -> str:
+    def complete_chat(self, context: str, user_message: str) -> str:
         ...
 
 
@@ -29,31 +40,18 @@ class OpenAILlmClient(LlmClient):
         self._client = OpenAI(api_key=settings.openai_api_key)
         self._system = load_system_prompt()
 
-    def complete(self, user_message: str, command_hint: str) -> str:
-        instruction = {
-            "status": (
-                "Gi svar i strukturen LOFOTEN 2027 STATUS: Tid til konkurranse, "
-                "nåværende treningsmengde, svømming/sykkel/løp/styrke status, "
-                "aerob kapasitet, skade/risiko, siste test, neste milepæl, "
-                "største utfordring, viktigste fokus neste 2–4 uker."
-            ),
-            "imorgen": (
-                "Gi en kort morgen-/planmelding for I MORGEN: hva som er planlagt "
-                "(fra events), belastning siste dager, anbefalt intensitet (RPE), "
-                "og ev. forslag til bytte hvis CURRENT_STATUS eller data tilsier det."
-            ),
-            "ukestatus": (
-                "Gi UKESTATUS med seksjonene: Gjennomført (timer og disipliner), "
-                "Belastning, Hva gikk bra?, Hva gikk dårlig?, Risiko, "
-                "Hva bør endres?, Neste uke (konkret forslag)."
-            ),
-        }.get(command_hint, "Svar som coach.")
-
+    def complete_chat(self, context: str, user_message: str) -> str:
         response = self._client.chat.completions.create(
             model=self._model,
             messages=[
-                {"role": "system", "content": self._system + "\n\n" + instruction},
-                {"role": "user", "content": user_message},
+                {
+                    "role": "system",
+                    "content": self._system + "\n\n" + _CHAT_INSTRUCTION,
+                },
+                {
+                    "role": "user",
+                    "content": f"{context}\n\n---\n\nBrukermelding:\n{user_message}",
+                },
             ],
             temperature=0.4,
         )

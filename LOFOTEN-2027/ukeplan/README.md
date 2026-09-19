@@ -7,4 +7,4 @@
 
 **Intervals:** Speil gro oversikt som **events** i intervals.icu-kalenderen (coach leser plan der i V1).
 
-Etter hver uke: `/ukestatus` i Slack + oppdater [CURRENT_STATUS.md](../CURRENT_STATUS.md).
+Etter hver uke: DM «ukestatus» til coach i Slack + oppdater [CURRENT_STATUS.md](../CURRENT_STATUS.md).

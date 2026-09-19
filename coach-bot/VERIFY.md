@@ -1,27 +1,25 @@
-# Verifiser Slack coach (V1)
-
-Kjør når bot og tunnel er aktive.
+# Verifiser Slack coach (DM)
 
 ## Forutsetninger
 
-- [ ] `coach-bot/.env` komplett
-- [ ] `python -m coach_bot.main` eller `./scripts/start.sh` kjører
-- [ ] `curl http://localhost:3000/health` → `{"ok": true, ...}`
-- [ ] cloudflared/ngrok peker til port 3000
-- [ ] Slack slash URL = `https://<tunnel>/slack/events`
+- [ ] `coach-bot/.env` komplett (inkl. `SLACK_APP_TOKEN`)
+- [ ] `./scripts/start.sh` kjører
+- [ ] `curl http://localhost:3000/ready` → `ok: true`
+- [ ] DM åpnet med appen i Slack
 
 ## Tester
 
-| Kommando | Forventet |
+| Handling | Forventet |
 |----------|-----------|
-| `/status` | Norsk LOFOTEN 2027 STATUS; bruker Intervals 28d + CURRENT_STATUS |
-| `/imorgen` | Plan fra Intervals events i morgen + anbefaling; eller tydelig «plan mangler» |
-| `/ukestatus` | Seksjoner: Gjennomført, Belastning, Hva gikk bra/dårlig, Risiko, Hva bør endres, Neste uke |
+| DM: «hvordan ligger jeg an?» | Norsk status med Intervals + CURRENT_STATUS |
+| DM: «hva i morgen?» | Events fra Intervals eller «plan mangler» |
+| DM: «ukestatus» | Gjennomført, belastning, risiko, neste uke |
+| Ukjent Slack-bruker | Blokkert når `ALLOWED_SLACK_USER_IDS` er satt |
 
 ## Feil
 
 | Symptom | Sjekk |
 |---------|--------|
-| `dispatch_failed` | Tunnel URL, signing secret, bot kjører |
-| Intervals-feil | Athlete ID, API key |
-| Timeout | OpenAI key; se terminal-logg |
+| Ingen svar i DM | Socket Mode på, `message.im` subscribed, bot kjører |
+| Intervals-feil i svar | Athlete ID, API key (uten mellomrom i `.env`) |
+| Lang ventetid | OpenAI; se terminal-logg |

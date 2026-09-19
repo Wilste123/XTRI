@@ -11,6 +11,9 @@ class RepoReader:
     def __init__(self, settings: Settings) -> None:
         self._root = settings.lofoten_dir
 
+    def has_current_status(self) -> bool:
+        return (self._root / "CURRENT_STATUS.md").is_file()
+
     def read(self, relative: str, max_chars: int | None = None) -> str:
         path = self._root / relative
         if not path.is_file():

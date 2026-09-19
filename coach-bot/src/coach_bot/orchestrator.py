@@ -1,4 +1,4 @@
-"""Coach orchestration per slash command."""
+"""Coach orchestration for Slack DM."""
 
 from __future__ import annotations
 
@@ -11,14 +11,14 @@ class CoachOrchestrator:
         self._context = context
         self._llm = llm
 
-    def run_status(self) -> str:
-        ctx = self._context.for_status()
-        return self._llm.complete(ctx, "status")
+    def run_chat(self, user_message: str) -> str:
+        ctx = self._context.for_chat()
+        return self._llm.complete_chat(ctx, user_message)
 
-    def run_imorgen(self) -> str:
-        ctx = self._context.for_imorgen()
-        return self._llm.complete(ctx, "imorgen")
-
-    def run_ukestatus(self) -> str:
-        ctx = self._context.for_ukestatus()
-        return self._llm.complete(ctx, "ukestatus")
+    def run_morning_briefing(self) -> str:
+        ctx = self._context.for_chat()
+        prompt = (
+            "Gi en kort morgenmelding for I DAG og I MORGEN: plan fra events, "
+            "belastning siste dager, anbefalt intensitet (RPE), og ett konkret fokus."
+        )
+        return self._llm.complete_chat(ctx, prompt)

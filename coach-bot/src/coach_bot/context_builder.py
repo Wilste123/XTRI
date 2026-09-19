@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import date, timedelta
 from typing import Any
 
@@ -58,15 +57,27 @@ def _format_wellness(rows: list[dict[str, Any]], limit: int = 7) -> str:
     return "\n".join(lines)
 
 
+def _format_recent_activities(recent: list[dict[str, Any]]) -> str:
+    if not recent:
+        return "(ingen økter i perioden)"
+    lines: list[str] = []
+    for act in recent:
+        tss = act.get("tss")
+        tss_s = f", TSS={tss}" if tss else ""
+        lines.append(
+            f"- {act.get('date')}: {act.get('type')} – {act.get('name')} "
+            f"({act.get('hours')} t{tss_s})"
+        )
+    return "\n".join(lines)
+
+
 class ContextBuilder:
     def __init__(self, intervals: IntervalsClient, repo: RepoReader, tz: str) -> None:
         self._intervals = intervals
         self._repo = repo
         self._tz = tz
 
-    def _base_intervals_text(
-        self, bundle: dict[str, Any], snapshot: Any
-    ) -> str:
+    def _training_block(self, bundle: dict[str, Any], snapshot: Any) -> str:
         parts = [
             f"As of: {snapshot.as_of} ({self._tz})",
             "",
@@ -83,58 +94,31 @@ class ContextBuilder:
             parts.append(
                 f"\nVolumendring 7d vs forrige 7d: {snapshot.volume_change_pct_7d:+.0f}%"
             )
-        parts.append("\n## Siste økter\n" + json.dumps(snapshot.recent_activities, ensure_ascii=False, indent=2))
+        parts.append("\n## Siste økter\n" + _format_recent_activities(snapshot.recent_activities))
         parts.append("\n## Wellness (siste dager)\n" + _format_wellness(bundle["wellness"]))
         return "\n".join(parts)
 
-    def for_status(self) -> str:
+    def for_chat(self) -> str:
         bundle = self._intervals.fetch_coach_bundle(activity_days=28)
-        snapshot = build_training_snapshot(bundle["activities"], tz=self._tz)
-        repo = self._repo.bundle_for_coach()
-        return (
-            "# Kommando: /status\n\n"
-            "## Intervals data\n"
-            + self._base_intervals_text(bundle, snapshot)
-            + "\n\n## Repo context\n"
-            + f"### CURRENT_STATUS\n{repo['current_status']}\n\n"
-            + f"### MASTERPLAN (utdrag)\n{repo['masterplan_excerpt']}\n"
-        )
-
-    def for_imorgen(self) -> str:
-        bundle = self._intervals.fetch_coach_bundle(activity_days=14)
         snapshot = build_training_snapshot(bundle["activities"], tz=self._tz)
         today = snapshot.as_of
         tomorrow = today + timedelta(days=1)
+        start_week = today - timedelta(days=6)
+
         events_tomorrow = filter_events_for_date(bundle["events"], tomorrow)
         events_today = filter_events_for_date(bundle["events"], today)
-        repo = self._repo.bundle_for_coach()
-        return (
-            "# Kommando: /imorgen\n\n"
-            f"I dag ({today}):\n{_format_events(events_today)}\n\n"
-            f"I morgen ({tomorrow}):\n{_format_events(events_tomorrow)}\n\n"
-            "## Intervals data (belastning)\n"
-            + self._base_intervals_text(bundle, snapshot)
-            + "\n\n## Repo context\n"
-            + f"### CURRENT_STATUS\n{repo['current_status']}\n"
-        )
-
-    def for_ukestatus(self) -> str:
-        bundle = self._intervals.fetch_coach_bundle(activity_days=28)
-        snapshot = build_training_snapshot(bundle["activities"], tz=self._tz)
-        today = snapshot.as_of
-        start_week = today - timedelta(days=6)
         events_week = filter_events_in_range(bundle["events"], start_week, today)
         repo = self._repo.bundle_for_coach()
+
         return (
-            "# Kommando: /ukestatus\n\n"
-            f"Uke {start_week} – {today}\n\n"
-            "## Plan (events denne uken)\n"
-            + _format_events(events_week)
-            + "\n\n## Gjennomført (Intervals aggregert)\n"
-            + format_hours_table(snapshot.last_7_days)
-            + "\n\n## Intervals (detalj)\n"
-            + self._base_intervals_text(bundle, snapshot)
+            "# Coach-kontekst (DM)\n\n"
+            f"## I dag ({today})\n{_format_events(events_today)}\n\n"
+            f"## I morgen ({tomorrow})\n{_format_events(events_tomorrow)}\n\n"
+            f"## Plan denne uken ({start_week} – {today})\n{_format_events(events_week)}\n\n"
+            "## Gjennomført (Intervals)\n"
+            + self._training_block(bundle, snapshot)
             + "\n\n## Repo context\n"
             + f"### CURRENT_STATUS\n{repo['current_status']}\n\n"
+            + f"### MASTERPLAN (utdrag)\n{repo['masterplan_excerpt']}\n\n"
             + f"### DAGENS_NIVA (utdrag)\n{repo['dagens_niva_excerpt']}\n"
         )
