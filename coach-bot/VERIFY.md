@@ -21,6 +21,9 @@
 | DM: «ukestatus» | Gjennomført, belastning, risiko, neste uke |
 | DM: `nullstill` | Tømmer samtalehistorikk |
 | DM: «synk kalender» → `ja` | Preview, deretter events i Intervals |
+| DM: «legg inn økt i morgen i intervals» | Øktforslag + preview; så `ja` eller «legg den inn» |
+| DM: etter forslag: «legg den inn i intervals» | Oppretter økt i Intervals (fra forrige melding) |
+| DM: `legg inn sykkel 60 min i morgen` | Direkte inn i Intervals (enkeltøkt) |
 | Ukjent Slack-bruker | Blokkert når `ALLOWED_SLACK_USER_IDS` er satt |
 
 ## Proaktiv (cron)
