@@ -6,42 +6,39 @@
 |--------|-----------------|
 | intervals.icu | Økter, wellness, belastning, kalenderplan (events) |
 | LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, beslutninger, strategi |
-| Slack | Brukergrensesnitt (V1: slash commands) |
+| Slack DM | Brukergrensesnitt |
 
 Rå økter lagres ikke som masse markdown i repo.
 
-## V1 flyt
+## Flyt
 
 ```mermaid
 flowchart LR
-  Slack --> Bot[coach_bot]
-  Bot --> Intervals[intervals.icu API]
-  Bot --> Repo[REPO_ROOT/LOFOTEN-2027]
-  Bot --> LLM[OpenAI]
-  LLM --> Bot --> Slack
+  SlackDM[Slack DM]
+  Bot[coach_bot]
+  Intervals[intervals.icu API]
+  Repo[LOFOTEN-2027]
+  LLM[OpenAI]
+  SlackDM --> Bot
+  Bot --> Intervals
+  Bot --> Repo
+  Bot --> LLM
+  LLM --> Bot
+  Bot --> SlackDM
 ```
+
+Transport: **Slack Socket Mode** (ingen tunnel). Valgfri morgen-DM via scheduler.
 
 ## Moduler (coach-bot)
 
-- `IntervalsClient` – activities, events, wellness
+- `IntervalsClient` – activities, events, wellness (cache + parallel fetch)
 - `RepoReader` – les markdown fra disk
-- `ContextBuilder` – kompakt kontekst til LLM
-- `CoachOrchestrator` – per kommando
-- `slack_handlers` – `/status`, `/imorgen`, `/ukestatus`
+- `ContextBuilder` – kompakt kontekst til LLM (`for_chat`)
+- `CoachOrchestrator` – `run_chat` / `run_morning_briefing`
+- `slack_handlers` – DM `message` events
+- `proactive` – morgenbriefing (valgfritt)
 
-## Roadmap
+## Senere (ikke i denne builden)
 
-| Versjon | Innhold |
-|---------|---------|
-| V1 | Slash commands, read-only repo |
-| V2 | `/logg` subjektive notater → repo |
-| V3 | Proaktiv morgenmelding (cron) |
-| V4 | Foreslå planendring → godkjenn → Intervals/repo |
-
-## Porter (utvidelse)
-
-- `TrainingDataProvider` – Intervals i V1
-- `PlanProvider` – Intervals events
-- `ProjectMemory` – RepoReader
-- `Notifier` – Slack
-- `Scheduler` – stub til V3
+- `/logg` subjektive notater → repo
+- Godkjent planendring → Intervals/repo

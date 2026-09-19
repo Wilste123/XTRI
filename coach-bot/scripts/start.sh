@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Lofoten coach-bot locally (port 3000).
+# Start Lofoten coach-bot (Socket Mode + health on PORT).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -17,7 +17,6 @@ fi
 source .venv/bin/activate
 pip install -q -e ".[dev]"
 
-echo "Starter coach på http://localhost:3000 (health: /health)"
-echo "Tunnel: cloudflared tunnel --url http://localhost:3000"
-echo "Slack Request URL: https://<tunnel-host>/slack/events"
+echo "Starter coach (Slack Socket Mode DM)"
+echo "Health: http://localhost:3000/health  ready: http://localhost:3000/ready"
 exec python -m coach_bot.main

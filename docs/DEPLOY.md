@@ -1,35 +1,27 @@
 # Deploy – Lofoten Coach
 
-## Lokal (anbefalt V1)
+## Lokal (anbefalt nå)
 
 ```bash
 cd coach-bot
-cp .env.example .env   # fyll inn nøkler
-uv sync
-uv run python -m coach_bot.main
+cp .env.example .env
+./scripts/start.sh
 ```
 
-- `REPO_ROOT=/Users/william/XTRI` (absolutt sti til repo)
-- Eksponer port **3000** med cloudflared/ngrok for Slack
+- `REPO_ROOT` = absolutt sti til XTRI-repo
+- Slack: Socket Mode (`SLACK_APP_TOKEN`) – **ingen tunnel**
+- Health: `http://localhost:3000/health` og `/ready`
 
-## Docker (forberedt)
+## Docker (valgfritt)
 
 ```bash
 cd coach-bot
 docker build -t lofoten-coach .
-docker run --env-file .env -p 3000:3000 -v /Users/william/XTRI:/repo:ro lofoten-coach
+docker run --env-file .env -p 3000:3000 -v /path/to/XTRI:/repo:ro lofoten-coach
 ```
 
 Sett `REPO_ROOT=/repo` i container.
 
-## Fly.io / Railway (V3+)
+## Sky
 
-1. Push image eller connect repo `coach-bot/`
-2. Sett alle env fra `.env.example`
-3. For V3: legg til cron som kaller intern endpoint eller separat worker
-
-V1 trenger ikke alltid-på server hvis du kun bruker slash commands mens maskinen kjører.
-
-## Hemmeligheter
-
-Aldri commit `.env`. Bruk platform secrets i sky.
+For morgenbriefing og DM døgnet rundt: kjør container/VM med samme env. Hemmeligheter via platform secrets – aldri i git.

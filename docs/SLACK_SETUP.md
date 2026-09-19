@@ -1,58 +1,72 @@
-# Slack-oppsett for Lofoten Coach (V1)
+# Slack-oppsett – DM-coach (Socket Mode)
 
 ## 1. Opprett Slack-app
 
-1. Gå til [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → From scratch.
+1. [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → From scratch.
 2. Navn f.eks. `Lofoten Coach`, workspace ditt.
 
-## 2. OAuth & scopes (Bot Token)
+## 2. Socket Mode
+
+1. **Socket Mode** → Enable.
+2. **Basic Information** → **App-Level Tokens** → Create token med scope `connections:write` → `SLACK_APP_TOKEN` (`xapp-…`).
+
+## 3. OAuth & Bot Token Scopes
 
 Under **OAuth & Permissions** → Bot Token Scopes:
 
 - `chat:write`
-- `commands`
+- `im:history`
+- `im:read`
+- `im:write`
 
-Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN` i `.env`.
+Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN`.
 
-## 3. Signing secret
+## 4. Signing secret
 
 **Basic Information** → **Signing Secret** → `SLACK_SIGNING_SECRET`.
 
-## 4. Slash commands
+## 5. Event Subscriptions
 
-Under **Slash Commands**, opprett tre kommandoer (samme Request URL):
+1. **Event Subscriptions** → Enable.
+2. Under **Subscribe to bot events**, legg til:
+   - `message.im` (DM til bot)
 
-| Command | Short description |
-|---------|-------------------|
-| `/status` | Lofoten 2027 status |
-| `/imorgen` | Plan og anbefaling i morgen |
-| `/ukestatus` | Ukentlig oppsummering |
+Socket Mode trenger **ikke** Request URL / tunnel.
 
-**Request URL (lokal utvikling):**
+## 6. Åpne DM med boten
 
-1. Start bot: `cd coach-bot && uv run python -m coach_bot.main`
-2. Tunnel: `cloudflared tunnel --url http://localhost:3000` (eller ngrok)
-3. Sett Request URL til `https://<tunnel-host>/slack/events`
+I Slack: **Apps** → Lofoten Coach → **Messages** → skriv første melding.
 
-Bolt bruker én endpoint for events og slash commands når appen er konfigurert med `SLACK_SIGNING_SECRET`.
+Sett `ALLOWED_SLACK_USER_IDS` i `.env` (din member ID).
 
-For **Socket Mode** (alternativ, ingen tunnel): aktiver Socket Mode, app-level token, og endre `main.py` – V1 leveres med HTTP på port 3000.
+## 7. Intervals plan
 
-## 5. Intervals plan
+Legg **ukentlig plan som events** i intervals.icu. Coach leser disse når du spør om i morgen / uke / plan.
 
-Legg **ukentlig plan som events** i intervals.icu-kalenderen. `/imorgen` og plan-delen av `/ukestatus` leser disse – grov plan er OK i V1.
+## 8. Start bot
 
-## 6. Tillat kun deg (anbefalt)
-
-Finn Slack user ID (profil → … → Copy member ID). Sett i `.env`:
-
-```
-ALLOWED_SLACK_USER_IDS=U01234567
+```bash
+cd coach-bot
+cp .env.example .env   # fyll inn tokens
+./scripts/start.sh
 ```
 
-Kommaseparert for flere.
+`curl http://localhost:3000/ready` – sjekk Intervals + repo.
 
-## 7. Verifiser
+## 9. Eksempler i DM
 
-- `/status` → svar innen ~30 s (LLM)
-- Tom plan i Intervals → bot skal si at plan mangler, ikke finne på økt
+- «Hvordan ligger jeg an?»
+- «Ukestatus»
+- «Hva skal jeg gjøre i morgen?»
+
+## Valgfritt: morgenbriefing
+
+I `.env`:
+
+```
+MORNING_BRIEFING_ENABLED=true
+MORNING_BRIEFING_HOUR=7
+MORNING_BRIEFING_MINUTE=0
+```
+
+Bot må kjøre på det tidspunktet (lokalt eller sky).
