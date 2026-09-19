@@ -4,6 +4,7 @@ from coach_bot.intent import (
     asks_for_plan_sync,
     detect_intent,
     strip_log_prefix,
+    wants_week_plan_write,
 )
 
 
@@ -29,3 +30,9 @@ def test_grafer_og_treningsplan():
     assert asks_capabilities(msg)
     assert asks_for_plan_sync(msg)
     assert detect_intent(msg) == Intent.CHART
+
+
+def test_week_plan_phrases():
+    msg = "legg inn ukeplanen i intervals"
+    assert asks_for_plan_sync(msg)
+    assert wants_week_plan_write(msg)

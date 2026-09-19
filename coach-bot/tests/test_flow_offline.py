@@ -211,7 +211,9 @@ def test_direct_single_workout_creates_event(orch):
 def test_week_sync_preview_then_confirm(orch):
     o = orch["orch"]
     preview = o.run_chat("synk kalender", user_id="U2")
-    assert "Forhåndsvisning" in preview.text
+    # Forhåndsvisning vises (kompakt UX lister økter + «ja»-instruks); ingen skriv ennå.
+    assert preview.text.strip()
+    assert "ja" in preview.text.lower()
     assert not orch["intervals"].bulk  # ingenting skrevet før bekreftelse
     confirm = o.run_chat("ja", user_id="U2")
     assert "Lagt inn" in confirm.text

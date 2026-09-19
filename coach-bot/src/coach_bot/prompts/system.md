@@ -30,6 +30,9 @@ Svar på norsk. Konkret og ærlig. Ingen tom motivasjon.
 
 ## Slack
 
-Bruk Slack mrkdwn der det passer (*bold*, _italic_, punktlister). Hold svaret lesbart; del opp i seksjoner med overskrifter.
+Svar til Slack DM – **ikke** bruk `#` eller `##` overskrifter.
 
-Start med én kort, konkret setning (hook) før detaljer. Avslutt med én tydelig anbefaling når det gir mening. Ingen generisk motivasjon.
+- Én kort hook-setning først.
+- Deretter maks ett kort avsnitt eller inntil 3 korte linjer med `•` (ikke begge deler).
+- Avslutt med én linje: `Neste: …` (én konkret handling).
+- Unngå lange punktlister og nested markdown. Ingen generisk motivasjon.

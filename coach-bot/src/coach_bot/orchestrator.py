@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from slack_sdk import WebClient
+
+logger = logging.getLogger(__name__)
 
 from coach_bot.charts import render_ctl_atl_chart, render_discipline_week_chart
 from coach_bot.coach_reply import CoachReply
@@ -14,6 +18,7 @@ from coach_bot.intent import (
     asks_for_plan_sync,
     detect_intent,
     strip_log_prefix,
+    wants_week_plan_write,
 )
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.intervals_planner import events_for_active_week, parse_single_workout_request
@@ -28,12 +33,8 @@ from coach_bot.repo_reader import RepoReader
 from coach_bot.repo_writer import RepoWriter
 from coach_bot.session_store import SessionStore
 from coach_bot.slack_delivery import post_dm
-from coach_bot.slack_format import (
-    briefing_blocks,
-    parse_brief_sections,
-    single_workout_preview_blocks,
-    week_preview_blocks,
-)
+from coach_bot.slack_compose import compact_reply, compact_system_message
+from coach_bot.slack_format import single_workout_preview_blocks, week_preview_blocks
 
 
 class CoachOrchestrator:
@@ -64,10 +65,7 @@ class CoachOrchestrator:
         return msgs
 
     def _wrap_llm_reply(self, text: str, intent: Intent, title: str) -> CoachReply:
-        sections = parse_brief_sections(text)
-        hook = sections[0][1].strip().split("\n")[0][:200] if sections else text[:200]
-        blocks = briefing_blocks(title, hook or text[:200], sections[1:] or sections)
-        return CoachReply(text=text, blocks=blocks)
+        return compact_reply(title, text)
 
     def _attach_charts(self, reply: CoachReply, bundle: dict, as_of) -> CoachReply:
         paths = []
@@ -103,12 +101,20 @@ class CoachOrchestrator:
             self._remember(user_id, text, reply.text)
             return reply
 
-        # Kombinert «grafer + treningsplan»-spørsmål besvares deterministisk –
-        # før write-oppfølgeren, som ellers fanger «legge inn …» i teksten.
+        # Kombinert «grafer + treningsplan»-spørsmål besvares deterministisk
+        # (charts + forhåndsvisning) – før uke-sync og write-oppfølgeren, som
+        # ellers fanger «legge inn …» i teksten.
         if asks_capabilities(text) or (asks_for_charts(text) and asks_for_plan_sync(text)):
             reply = self._reply_graphics_and_plan(text, user_id)
             self._remember(user_id, text, reply.text)
             return reply
+
+        # Rene «legg inn ukeplan / synk kalender»-forespørsler -> uke-sync.
+        if wants_week_plan_write(text):
+            sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
+            if sync:
+                self._remember(user_id, text, sync.text)
+                return sync
 
         # Direkte enkeltøkt med eksplisitt idrett + varighet (f.eks.
         # «legg inn sykkel 60 min i morgen») må opprettes direkte – før
@@ -163,7 +169,7 @@ class CoachOrchestrator:
             snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
             reply = self._attach_charts(reply, bundle, snap.as_of)
             if intent in (Intent.WEEK, Intent.CHART, Intent.ANALYSIS) and not reply.image_paths:
-                reply.text += "\n\n_(Grafer mangler – for lite wellness/øktdata i Intervals.)_"
+                reply.text += "\n\nNeste: logg økter/wellness i Intervals, eller sjekk files:write på Slack-appen."
 
         if wants_intervals_write(text) and self._sessions and self._intervals:
             event = extract_workout_from_text(
@@ -191,13 +197,10 @@ class CoachOrchestrator:
             return None
         sub = lower.split(":", 1)[1].strip()
         if sub == "test":
-            return CoachReply(
-                text="Coach-bot proaktiv test OK – Slack DM fungerer.",
-                blocks=briefing_blocks(
-                    "Proaktiv test",
-                    "Coach-bot kan sende meldinger til deg uten at du skriver først.",
-                    [("Neste steg", "Prøv `briefing: morgen` eller `briefing: uke` for full briefing.")],
-                ),
+            return compact_system_message(
+                "Proaktiv test",
+                "Coach-bot kan sende meldinger uten at du skriver først.",
+                "Neste: prøv `briefing: morgen` eller `briefing: uke`.",
             )
         if sub in ("morgen", "morning"):
             body = self.run_morning_briefing()
@@ -269,6 +272,8 @@ class CoachOrchestrator:
     def _handle_intervals_write_followup(self, text: str, user_id: str) -> CoachReply | None:
         if not self._sessions or not self._intervals:
             return None
+        if wants_week_plan_write(text):
+            return None
         if not wants_intervals_write(text) and not is_commit_message(text):
             return None
 
@@ -339,23 +344,13 @@ class CoachOrchestrator:
     def _reply_graphics_and_plan(self, text: str, user_id: str) -> CoachReply:
         """Deterministic answer when user asks for charts + Intervals plan (avoids LLM «kan ikke»)."""
         body = (
-            "Ja – grafer legges ved som bilder i denne tråden (CTL/ATL og disiplinvolum fra Intervals). "
-            "Ukeplan fra repo kan legges i Intervals-kalenderen etter forhåndsvisning – svar *ja* når du er fornøyd."
+            "Grafer legges ved som bilder her (CTL/ATL og disiplinvolum). "
+            "Ukeplan: `synk kalender` → forhåndsvisning → `ja`."
         )
-        reply = CoachReply(
-            text=body,
-            blocks=briefing_blocks(
-                "Grafer og treningsplan",
-                body,
-                [
-                    (
-                        "Kommandoer",
-                        "• `ukestatus` eller `graf` – flere grafer\n"
-                        "• `synk kalender` – hele uken\n"
-                        "• `legg inn løp 45 min på tirsdag` – enkeltøkt",
-                    ),
-                ],
-            ),
+        reply = compact_system_message(
+            "Grafer og plan",
+            body,
+            "Neste: `ukestatus`, `synk kalender`, eller `legg inn sykkel 60 min i morgen`.",
         )
         if self._intervals:
             bundle = self._intervals.fetch_coach_bundle()
@@ -364,7 +359,7 @@ class CoachOrchestrator:
             snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
             reply = self._attach_charts(reply, bundle, snap.as_of)
             if not reply.image_paths:
-                reply.text += "\n\n_(Grafer mangler – logg økter/wellness i Intervals først.)_"
+                reply.text += "\n\nNeste: logg data i Intervals eller sjekk files:write på Slack-appen."
         sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
         if sync:
             reply.text += f"\n\n{sync.text}"
@@ -373,19 +368,37 @@ class CoachOrchestrator:
         return reply
 
     def _handle_sync_week(self, text: str, user_id: str, intent: Intent) -> CoachReply | None:
-        if intent != Intent.SYNC_WEEK or not self._repo or not self._sessions:
+        if intent != Intent.SYNC_WEEK and not wants_week_plan_write(text):
             return None
+        if not self._repo or not self._sessions:
+            return None
+        pending = self._sessions.get_pending(user_id)
+        if pending and pending[0] == "intervals_single":
+            return compact_system_message(
+                "Ventende økt",
+                "Du har et enkeltøktforslag som ikke er bekreftet ennå.",
+                "Neste: skriv `ja` / `avbryt`, eller `nullstill`.",
+            )
+        week_ref = self._repo.active_training_week()
+        logger.info("Week sync: active plan %s", week_ref.filename)
         events = events_for_active_week(self._repo)
         if not events:
-            return CoachReply(text="Fant ingen økter å synce fra aktiv ukeplan i repo.")
+            return compact_system_message(
+                "Ingen ukeplan",
+                f"Fant ingen økter å synce fra {week_ref.filename}. Rebuild deploy hvis du nettopp oppdaterte ukeplan i git.",
+                "Neste: sjekk LOFOTEN-2027/ukeplan eller skriv en enkeltøkt.",
+            )
         self._sessions.set_pending(user_id, "intervals_week", {"events": events})
         preview = "\n".join(
             f"- {(e.get('start_date_local') or '')[:10]}: {e.get('name')}" for e in events[:14]
         )
-        return CoachReply(
-            text=f"Forhåndsvisning ({len(events)} økter):\n{preview}\n\nSvar *ja* for å legge inn i Intervals.",
-            blocks=week_preview_blocks(events),
+        reply = compact_system_message(
+            f"Ukeplan ({len(events)} økter)",
+            preview,
+            "Neste: svar `ja` for å legge inn i Intervals.",
         )
+        reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + week_preview_blocks(events)
+        return reply
 
     def _handle_single_workout(self, text: str, user_id: str) -> CoachReply | None:
         if not self._intervals:

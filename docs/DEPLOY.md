@@ -26,6 +26,8 @@ Image baker inn `LOFOTEN-2027/` ved build (`REPO_ROOT=/app`). Oppdater plan i gi
 
 Fra **repo-roten** (ikke bare `coach-bot/`):
 
+Deploy **fra repo-roten** (der `coach-bot/` og `LOFOTEN-2027/` ligger). `fly.toml` bruker `context = ".."` og `dockerfile = "coach-bot/Dockerfile"`.
+
 ```bash
 cd /path/to/XTRI
 fly launch --config coach-bot/fly.toml --no-deploy

@@ -166,7 +166,31 @@ def asks_for_plan_sync(message: str) -> bool:
         "putt",
         "importer",
     )
+    week_phrases = (
+        "ukeplanen",
+        "legg inn planen",
+        "legge inn planen",
+        "hele uken",
+        "treningsplanen",
+        "ukeplan",
+        "synk kalender",
+        "synk uke",
+    )
+    if any(p in lower for p in week_phrases) and any(
+        a in lower for a in action_words + ("plan", "uke", "kalender", "intervals", "intervalls")
+    ):
+        return True
     return any(p in lower for p in plan_words) and any(a in lower for a in action_words)
+
+
+def wants_week_plan_write(message: str) -> bool:
+    """User wants full week plan in Intervals (not single workout follow-up)."""
+    lower = (message or "").lower()
+    if asks_for_plan_sync(message):
+        return True
+    if any(w in lower for w in ("ukeplanen", "treningsplanen", "hele uken", "synk kalender")):
+        return "interval" in lower or "legg" in lower or "legge" in lower or "synk" in lower
+    return False
 
 
 def asks_capabilities(message: str) -> bool:

@@ -62,6 +62,12 @@ Se [DEPLOY.md](DEPLOY.md) – Docker/Fly med `LOFOTEN-2027` baked in.
 - Intervals write: uke-preview + `ja`, enkeltøkt auto (`intervals_planner` + bulk upsert)
 - `POST /admin/briefing` med `X-Admin-Secret`
 
+## Persistens (SQLite vs Supabase)
+
+- **Nå:** [`session_store.py`](../coach-bot/src/coach_bot/session_store.py) (SQLite) – samtale + `pending_actions` for Intervals-bekreftelse.
+- **Fly:** Ephemeral disk – `sessions.db` kan nullstilles ved redeploy (pending «ja» kan forsvinne). Valgfritt Fly volume eller restart etter deploy.
+- **Fase 2 (valgfri):** Supabase kun som `SessionStore`-backend (samme API, tabeller `turns` + `pending_actions`). **Ikke** flytt COACH_BRIEF, Intervals eller repo-hit dit. Intervals + git forblir source of truth.
+
 ## Senere
 
 - Web-UI
