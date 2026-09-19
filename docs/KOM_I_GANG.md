@@ -33,19 +33,17 @@ Bruk denne som hoved-sjekkliste. Kryss av når du er ferdig (rediger filen eller
 
 ---
 
-## Fase 3 – Slack + bot
+## Fase 3 – Slack + coach (V3)
 
-Se også [SLACK_SETUP.md](SLACK_SETUP.md).
+Se [COACH_V3_USER_CHECKLIST.md](COACH_V3_USER_CHECKLIST.md) og [SLACK_SETUP.md](SLACK_SETUP.md).
 
-- [ ] Slack-app opprettet (`chat:write`, `commands`)
-- [ ] `SLACK_BOT_TOKEN` + `SLACK_SIGNING_SECRET` i `.env`
-- [ ] Slash: `/status`, `/imorgen`, `/ukestatus` → `https://<tunnel>/slack/events`
-- [ ] `ALLOWED_SLACK_USER_IDS` = din Slack member ID
-- [ ] `REPO_ROOT=/Users/william/XTRI` i `.env`
-- [ ] Start bot: `./coach-bot/scripts/start.sh` (eller se script)
-- [ ] Tunnel: `cloudflared tunnel --url http://localhost:3000`
-- [ ] `curl http://localhost:3000/health` → ok
-- [ ] Test `/status` i Slack (15–30 s)
+- [ ] Slack-app: **Socket Mode** + `message.im` + bot scopes (DM)
+- [ ] `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_APP_TOKEN` (Fly secrets eller `.env`)
+- [ ] `ALLOWED_SLACK_USER_IDS` + `SLACK_NOTIFY_USER_IDS`
+- [ ] Deploy: `fly deploy --config coach-bot/fly.toml` (eller lokal `./coach-bot/scripts/start.sh`)
+- [ ] Test DM til XTRI Coach + `jobs morning`
+
+**Ikke lenger påkrevd:** cloudflared, slash Request URL (med mindre `SLACK_ENABLE_SLASH=true`).
 
 ---
 

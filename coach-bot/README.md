@@ -1,24 +1,24 @@
-# Lofoten AI Coach (V1)
+# Lofoten AI Coach (V3)
 
-Slack-bot som leser **intervals.icu** (økter, wellness, kalenderplan) og **LOFOTEN-2027**-repoet, og svarer som coach via OpenAI.
+Slack-coach via **DM-samtale** og **proaktive meldinger** (morgen, ukentlig, ny økt i Intervals). Leser **intervals.icu** og **LOFOTEN-2027**, svarer via OpenAI.
 
-## Kommandoer
+## Bruk
 
-| Slack | Beskrivelse |
-|-------|-------------|
-| `/status` | LOFOTEN 2027 STATUS |
-| `/imorgen` | Plan i morgen + anbefaling |
-| `/ukestatus` | Ukentlig oppsummering |
+| Kanal | Hva |
+|-------|-----|
+| DM til XTRI Coach | Fri chat («Hva bør jeg gjøre i morgen?») |
+| Automatisk | Daglig morgenbrief, søndag ukestatus, melding ved ny aktivitet |
+
+Valgfritt: slash med `SLACK_ENABLE_SLASH=true` (legacy).
 
 ## Oppsett
 
-Full sjekkliste: [docs/KOM_I_GANG.md](../docs/KOM_I_GANG.md)
+**Din sjekkliste:** [docs/COACH_V3_USER_CHECKLIST.md](../docs/COACH_V3_USER_CHECKLIST.md)
 
-1. [SETUP_ENV.md](SETUP_ENV.md) – `.env` fra `.env.example`
-2. [docs/INTERVALS_QUICKSTART.md](../docs/INTERVALS_QUICKSTART.md) – sync + kalender
-3. [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) – Slack-app og tunnel
-4. [LOFOTEN-2027/CURRENT_STATUS.md](../LOFOTEN-2027/CURRENT_STATUS.md)
-5. Verifiser: [VERIFY.md](VERIFY.md)
+1. [SETUP_ENV.md](SETUP_ENV.md)
+2. [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) – Socket Mode
+3. [docs/DEPLOY.md](../docs/DEPLOY.md) – Fly.io
+4. [docs/INTERVALS_QUICKSTART.md](../docs/INTERVALS_QUICKSTART.md)
 
 ## Kjøre lokalt
 
@@ -26,19 +26,17 @@ Full sjekkliste: [docs/KOM_I_GANG.md](../docs/KOM_I_GANG.md)
 ./scripts/start.sh
 ```
 
-Eller manuelt:
+`SLACK_MODE=socket` (standard). Ingen tunnel.
+
+Health: `GET /health` (default port **8080**)
+
+Manuelle jobber:
 
 ```bash
-cd coach-bot
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-python -m coach_bot.main
+python -m coach_bot.jobs morning
+python -m coach_bot.jobs weekly
+python -m coach_bot.jobs poll
 ```
-
-Server på `http://localhost:3000` – Slack Request URL: `https://<tunnel>/slack/events`.
-
-Health: `GET /health`
 
 ## Tester
 
@@ -47,13 +45,8 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## Verifikasjon (manuell)
+## Verifikasjon
 
-- [ ] `/status` returnerer norsk status uten timeout
-- [ ] `/imorgen` viser events fra Intervals eller sier at plan mangler
-- [ ] `/ukestatus` har seksjonene Gjennomført … Neste uke
-- [ ] Ukjent Slack-bruker blokkeres når `ALLOWED_SLACK_USER_IDS` er satt
-
-## Arkitektur
-
-Se [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+- [ ] DM → norsk coachesvar
+- [ ] `jobs morning` → melding i Slack
+- [ ] Ny økt i Intervals → oppfølging innen poll-intervall

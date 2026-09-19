@@ -47,6 +47,21 @@ class OpenAILlmClient(LlmClient):
                 "Belastning, Hva gikk bra?, Hva gikk dårlig?, Risiko, "
                 "Hva bør endres?, Neste uke (konkret forslag)."
             ),
+            "chat": (
+                "Svar kort og konkret på brukerens spørsmål som coach. "
+                "Bruk data i konteksten; ikke finn på økter eller plan."
+            ),
+            "morning_brief": (
+                "Dette er en *proaktiv morgenmelding* til Slack DM. "
+                "Gi kort dagens plan (events), belastning siste dager, "
+                "anbefalt intensitet (RPE) og ett tydelig fokus i dag."
+            ),
+            "post_workout": (
+                "Brukeren har nettopp fullført en økt. Gi kort oppsummering, "
+                "vurder om volum/intensitet matcher plan og CURRENT_STATUS. "
+                "Konkluder med enten «ingen justering nødvendig» eller "
+                "konkrete forslag (f.eks. roligere i morgen, bytte økt)."
+            ),
         }.get(command_hint, "Svar som coach.")
 
         response = self._client.chat.completions.create(

@@ -1,72 +1,87 @@
-# Slack-oppsett for Lofoten Coach (V1)
+# Slack-oppsett for XTRI Coach (V3 – Socket Mode)
 
-## 1. Opprett Slack-app
+Ingen cloudflared. Ingen slash-kommandoer påkrevd. **DM-samtale + proaktive meldinger** (når bot kjører på Fly/Mac).
 
-1. Gå til [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → From scratch.
-2. Navn f.eks. `Lofoten Coach`, workspace ditt.
+## 1. Opprett / oppdater Slack-app
 
-## 2. OAuth & scopes (Bot Token)
+1. [api.slack.com/apps](https://api.slack.com/apps) → **XTRI Coach** (eller ny app).
+2. **Socket Mode** → **Enable**.
+3. **Basic Information** → **App-Level Tokens** → Create with scope **`connections:write`** → `SLACK_APP_TOKEN` (`xapp-…`).
 
-Under **OAuth & Permissions** → Bot Token Scopes:
+## 2. Bot scopes
 
-- `chat:write`
-- `commands`
+**OAuth & Permissions** → Bot Token Scopes:
 
-Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN` i `.env`.
+| Scope | Hvorfor |
+|-------|---------|
+| `chat:write` | Svar og proaktive meldinger |
+| `im:history` | Les DM |
+| `im:read` | DM |
+| `im:write` | DM |
 
-## 3. Signing secret
+Valgfritt (kanal `@mention`):
 
-**Basic Information** → **Signing Secret** → `SLACK_SIGNING_SECRET`.
+| Scope | Env |
+|-------|-----|
+| `app_mentions:read` | `SLACK_ENABLE_MENTIONS=true` |
+| `channels:history` | samme |
 
-## 4. Slash commands
+**Reinstall to Workspace** → kopier ny **`SLACK_BOT_TOKEN`** (`xoxb-…`).
 
-Under **Slash Commands**, opprett tre kommandoer (samme Request URL):
+**Signing Secret** (Basic Information) → `SLACK_SIGNING_SECRET`.
 
-| Command | Short description |
-|---------|-------------------|
-| `/status` | Lofoten 2027 status |
-| `/imorgen` | Plan og anbefaling i morgen |
-| `/ukestatus` | Ukentlig oppsummering |
+## 3. Event Subscriptions
 
-**Request URL (lokal utvikling):**
+1. **Event Subscriptions** → **Enable Events**.
+2. Under **Subscribe to bot events**, legg til:
+   - **`message.im`** (påkrevd for DM-chat)
+   - **`app_mention`** hvis du bruker `@XTRI Coach` i kanaler
 
-1. Start bot: `cd coach-bot && uv run python -m coach_bot.main`
-2. Tunnel: `cloudflared tunnel --url http://localhost:3000` (eller ngrok)
-3. Sett Request URL til `https://<tunnel-host>/slack/events`
+Med Socket Mode trenger du **ikke** Request URL for events (tilkobling går over WebSocket).
 
-Bolt bruker én endpoint for events og slash commands når appen er konfigurert med `SLACK_SIGNING_SECRET`.
+## 4. `.env` (lokal) / Fly secrets (sky)
 
-For **Socket Mode** (alternativ, ingen tunnel): aktiver Socket Mode, app-level token, og endre `main.py` – V1 leveres med HTTP på port 3000.
-
-## 5. Intervals plan
-
-Legg **ukentlig plan som events** i intervals.icu-kalenderen. `/imorgen` og plan-delen av `/ukestatus` leser disse – grov plan er OK i V1.
-
-## 6. Tillat kun deg (anbefalt)
-
-Finn Slack user ID (profil → … → Copy member ID). Sett i `.env`:
+Se [coach-bot/.env.example](../coach-bot/.env.example). Minimum:
 
 ```
-ALLOWED_SLACK_USER_IDS=U01234567
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_SIGNING_SECRET=...
+SLACK_APP_TOKEN=xapp-...
+SLACK_MODE=socket
+ALLOWED_SLACK_USER_IDS=U0BSCE53YF2
+SLACK_NOTIFY_USER_IDS=U0BSCE53YF2
+REPO_ROOT=/Users/william/XTRI
+INTERVALS_ATHLETE_ID=i...
+INTERVALS_API_KEY=...
+OPENAI_API_KEY=...
 ```
 
-Kommaseparert for flere.
+## 5. Kjøre lokalt (test)
+
+```bash
+cd coach-bot
+cp .env.example .env   # fyll inn
+./scripts/start.sh
+```
+
+Åpne **DM med XTRI Coach** → skriv f.eks. «Hva er fokus denne uka?»
+
+Manuell proaktiv test:
+
+```bash
+source .venv/bin/activate
+python -m coach_bot.jobs morning
+python -m coach_bot.jobs poll
+```
+
+## 6. Legacy slash (valgfritt)
+
+Sett `SLACK_ENABLE_SLASH=true` og opprett `/status`, `/imorgen`, `/ukestatus` med Request URL kun hvis du bruker `SLACK_MODE=http` + tunnel. **Anbefales ikke** i V3.
 
 ## 7. Verifiser
 
-- `/status` → svar innen ~30 s (LLM)
-- Tom plan i Intervals → bot skal si at plan mangler, ikke finne på økt
+- [ ] DM → svar innen ~30 s
+- [ ] `python -m coach_bot.jobs morning` → melding i DM
+- [ ] Ny økt i Intervals → melding innen ~`ACTIVITY_POLL_MINUTES` (utenom quiet hours)
 
-## 8. @mention vs slash (V1)
-
-**Lofoten coach-bot svarer ikke på `@XTRI Coach` eller vanlige kanalmeldinger.** Koden har kun slash-kommandoer (`/status`, `/imorgen`, `/ukestatus`).
-
-Bruk f.eks.:
-
-```
-/status
-```
-
-Forutsetninger samme som over: bot kjører lokalt, **cloudflared** peker på port 3000, slash **Request URL** = `https://<tunnel>/slack/events`, bot invitert i kanalen (`/invite @XTRI Coach`).
-
-Dette er **ikke** Cursor-agenten i Slack – det er en egen app som må kjøre på Macen din mens du tester.
+Feilsøking: [coach-bot/SETUP_ENV.md](../coach-bot/SETUP_ENV.md)

@@ -138,3 +138,36 @@ class ContextBuilder:
             + f"### CURRENT_STATUS\n{repo['current_status']}\n\n"
             + f"### DAGENS_NIVA (utdrag)\n{repo['dagens_niva_excerpt']}\n"
         )
+
+    def for_chat(self, user_message: str) -> str:
+        status_ctx = self.for_status()
+        imorgen_ctx = self.for_imorgen()
+        return (
+            "# Fri samtale\n\n"
+            f"## Brukerens melding\n{user_message}\n\n"
+            "## Bakgrunn (status)\n"
+            + status_ctx
+            + "\n\n## Bakgrunn (plan/belastning i morgen)\n"
+            + imorgen_ctx
+        )
+
+    def for_morning_brief(self) -> str:
+        return self.for_imorgen()
+
+    def for_post_workout(self, activity: dict[str, Any]) -> str:
+        bundle = self._intervals.fetch_coach_bundle(activity_days=14)
+        snapshot = build_training_snapshot(bundle["activities"], tz=self._tz)
+        today = snapshot.as_of
+        events_today = filter_events_for_date(bundle["events"], today)
+        repo = self._repo.bundle_for_coach()
+        return (
+            "# Ny økt registrert\n\n"
+            "## Aktivitet (Intervals)\n"
+            + json.dumps(activity, ensure_ascii=False, indent=2)
+            + "\n\n## Plan i dag\n"
+            + _format_events(events_today)
+            + "\n\n## Belastning\n"
+            + self._base_intervals_text(bundle, snapshot)
+            + "\n\n## Repo context\n"
+            + f"### CURRENT_STATUS\n{repo['current_status']}\n"
+        )

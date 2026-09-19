@@ -6,7 +6,7 @@
 |--------|-----------------|
 | intervals.icu | Økter, wellness, belastning, kalenderplan (events) |
 | LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, beslutninger, strategi |
-| Slack | Brukergrensesnitt (V1: slash commands) |
+| Slack | Brukergrensesnitt (V3: DM + proaktive meldinger; valgfri slash) |
 
 Rå økter lagres ikke som masse markdown i repo.
 
@@ -34,8 +34,8 @@ flowchart LR
 | Versjon | Innhold |
 |---------|---------|
 | V1 | Slash commands, read-only repo |
-| V2 | `/logg` subjektive notater → repo |
-| V3 | Proaktiv morgenmelding (cron) |
+| V2 | `/logg` subjektive notater → repo (planlagt) |
+| V3 | **Socket DM chat, morgenbrief, ukentlig push, ny-økt-varsler** (Fly/local) |
 | V4 | Foreslå planendring → godkjenn → Intervals/repo |
 
 ## Porter (utvidelse)

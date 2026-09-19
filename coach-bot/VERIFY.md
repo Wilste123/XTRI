@@ -1,27 +1,25 @@
-# Verifiser Slack coach (V1)
-
-Kjør når bot og tunnel er aktive.
+# Verifiser XTRI Coach (V3)
 
 ## Forutsetninger
 
-- [ ] `coach-bot/.env` komplett
-- [ ] `python -m coach_bot.main` eller `./scripts/start.sh` kjører
-- [ ] `curl http://localhost:3000/health` → `{"ok": true, ...}`
-- [ ] cloudflared/ngrok peker til port 3000
-- [ ] Slack slash URL = `https://<tunnel>/slack/events`
+- [ ] Slack Socket Mode + `message.im` (se [SLACK_SETUP.md](../docs/SLACK_SETUP.md))
+- [ ] Fly deploy eller `./scripts/start.sh` lokalt
+- [ ] `curl http://localhost:8080/health` eller Fly `/health` → ok
 
 ## Tester
 
-| Kommando | Forventet |
-|----------|-----------|
-| `/status` | Norsk LOFOTEN 2027 STATUS; bruker Intervals 28d + CURRENT_STATUS |
-| `/imorgen` | Plan fra Intervals events i morgen + anbefaling; eller tydelig «plan mangler» |
-| `/ukestatus` | Seksjoner: Gjennomført, Belastning, Hva gikk bra/dårlig, Risiko, Hva bør endres, Neste uke |
+| Test | Forventet |
+|------|-----------|
+| DM: «Hva er fokus denne uka?» | Norsk coachesvar med Intervals + repo |
+| `python -m coach_bot.jobs morning` | Proaktiv morgenmelding i DM |
+| `python -m coach_bot.jobs weekly` | Ukentlig struktur (ukestatus) |
+| Ny aktivitet i Intervals | DM innen `ACTIVITY_POLL_MINUTES` (utenom quiet hours) |
 
 ## Feil
 
 | Symptom | Sjekk |
 |---------|--------|
-| `dispatch_failed` | Tunnel URL, signing secret, bot kjører |
-| Intervals-feil | Athlete ID, API key |
-| Timeout | OpenAI key; se terminal-logg |
+| Ingen svar i DM | Event `message.im`, bot kjører, `ALLOWED_SLACK_USER_IDS` |
+| `account_inactive` | Reinstall Slack-app, oppdater `xoxb` token |
+| Ingen morgenmelding | Fly maskin kjører, timezone `Europe/Oslo`, logs |
+| Ingen økt-melding | Bootstrap første gang; Garmin→Intervals (ikke bare Strava uten webhook) |

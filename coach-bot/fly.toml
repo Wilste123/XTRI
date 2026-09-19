@@ -1,0 +1,42 @@
+# fly.toml – deploy from repo root:
+#   fly launch --no-deploy --config coach-bot/fly.toml
+#   fly volumes create coach_data --region ams --size 1
+#   fly secrets set ... (see docs/DEPLOY.md)
+#   fly deploy --config coach-bot/fly.toml
+
+app = 'lofoten-coach'
+primary_region = 'ams'
+
+[build]
+  dockerfile = 'coach-bot/Dockerfile'
+
+[env]
+  PORT = '8080'
+  REPO_ROOT = '/app/LOFOTEN-2027'
+  STATE_PATH = '/data/coach_state.json'
+  SLACK_MODE = 'socket'
+  TZ = 'Europe/Oslo'
+
+[mounts]
+  source = 'coach_data'
+  destination = '/data'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '20s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

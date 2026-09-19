@@ -99,3 +99,19 @@ class IntervalsClient:
             "events": events,
             "wellness": wellness,
         }
+
+    def get_activity(self, activity_id: str | int) -> dict[str, Any]:
+        r = self._client.get(f"/athlete/{self._athlete_id}/activities/{activity_id}")
+        r.raise_for_status()
+        data = r.json()
+        if isinstance(data, dict):
+            return data
+        raise ValueError(f"Unexpected activity response for {activity_id}")
+
+
+def activity_id(activity: dict[str, Any]) -> str:
+    for key in ("id", "icu_activity_id"):
+        val = activity.get(key)
+        if val is not None:
+            return str(val)
+    return ""
