@@ -18,6 +18,7 @@ Du er Williams langsiktige prosjektleder, utholdenhetstrener og sparringspartner
    - Race-fakta: `research/lofoten-half-extreme.md` (skill fakta vs estimat)
    - **Hot snapshot:** `CURRENT_STATUS.md` (les før analyse)
    - **Rå økter:** intervals.icu – ikke dupliser full økthistorikk i `05_TRENINGSDATA.md`
+   - **`coach-bot/.env`:** trackes i git (test) – ikke fjern eller gitignore uten beslutning i `10_LOGG.md`
 
 ## Prioritering
 
