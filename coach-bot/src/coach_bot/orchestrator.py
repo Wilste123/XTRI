@@ -24,8 +24,10 @@ from coach_bot.intervals_client import IntervalsClient
 from coach_bot.intervals_planner import events_for_active_week, parse_single_workout_request
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
+    extract_week_plan_from_text,
     extract_workout_from_text,
     is_commit_message,
+    wants_full_plan,
     wants_intervals_write,
 )
 from coach_bot.llm_client import LlmClient
@@ -291,6 +293,34 @@ class CoachOrchestrator:
                     "`legg inn sykkel 60 min i morgen`."
                 )
             )
+
+        # Flerdagers plan fra chatten («legg inn hele planen» / «disse»):
+        # parse alle dagene coachen nettopp foreslo, ikke bare én økt.
+        if wants_full_plan(text):
+            week_events = extract_week_plan_from_text(
+                last, as_of=self._intervals.today()
+            )
+            if len(week_events) >= 2:
+                self._sessions.set_pending(
+                    user_id, "intervals_week", {"events": week_events}
+                )
+                if is_commit_message(text):
+                    return self._commit_pending(
+                        user_id, ("intervals_week", {"events": week_events})
+                    )
+                preview = "\n".join(
+                    f"- {(e.get('start_date_local') or '')[:10]}: {e.get('name')}"
+                    for e in week_events
+                )
+                reply = compact_system_message(
+                    f"Plan ({len(week_events)} økter)",
+                    preview,
+                    "Neste: svar «ja» for å legge inn alle i Intervals.",
+                )
+                reply.blocks = (reply.blocks or []) + [
+                    {"type": "divider"}
+                ] + week_preview_blocks(week_events)
+                return reply
 
         user_hint = text
         for msg in reversed(self._sessions.get_messages(user_id)):

@@ -308,3 +308,30 @@ def test_reply_never_denies_ability(orch):
     assert "beklager misforståelsen" not in low
     # Skal i stedet tilby å legge inn økten.
     assert "legg" in low or "ja" in low
+
+
+_PLAN_LLM_TEXT = (
+    "Her er planen for de neste dagene:\n"
+    "**19. september (i dag)**: Løpeøkt 45 min rolig.\n"
+    "**20. september**: Sykle 1 time lav intensitet.\n"
+    "**21. september**: Svøm 30 min teknikk.\n"
+)
+
+
+class PlanLlm(FakeLlm):
+    def complete_chat(self, *args, **kwargs) -> str:
+        return _PLAN_LLM_TEXT
+
+
+def test_full_plan_write_from_chat(orch):
+    o = orch["orch"]
+    o._llm = PlanLlm()
+    # Coachen foreslår en flerdagers plan i chatten ...
+    o.run_chat("kan du lage en plan for de neste dagene?", user_id="UP")
+    # ... og «legg inn hele planen» skal fange ALLE dagene, ikke bare én.
+    preview = o.run_chat("legg inn hele planen", user_id="UP")
+    assert preview.text.count("2026-09") >= 3
+    assert not orch["intervals"].bulk  # ingen skriv før bekreftelse
+    confirm = o.run_chat("ja", user_id="UP")
+    assert "Lagt inn" in confirm.text
+    assert len(orch["intervals"].bulk) == 3

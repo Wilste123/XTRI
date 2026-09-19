@@ -141,7 +141,23 @@ def strip_log_prefix(message: str) -> str:
 
 def asks_for_charts(message: str) -> bool:
     lower = (message or "").lower()
-    return any(k in lower for k in ("graf", "chart", "visualiser", "figur", "plot"))
+    return any(
+        k in lower
+        for k in (
+            "graf",
+            "chart",
+            "visualiser",
+            "visuell",
+            "visuelt",
+            "figur",
+            "plot",
+            "diagram",
+            "kurve",
+            "tidslinje",
+            "illustrasjon",
+            "fremstilling",
+        )
+    )
 
 
 def asks_for_plan_sync(message: str) -> bool:

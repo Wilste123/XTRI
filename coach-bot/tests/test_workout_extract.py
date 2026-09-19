@@ -2,10 +2,19 @@ from datetime import date
 
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
+    extract_week_plan_from_text,
     extract_workout_from_text,
     is_commit_message,
+    wants_full_plan,
     wants_intervals_write,
 )
+
+_MULTI_DAY_PLAN = """Her er planen for de neste dagene:
+**19. september (i dag)**: Løpeøkt 45 min rolig.
+**20. september**: Sykle 1 time lav intensitet.
+**21. september**: Svøm 30 min teknikk.
+**24. september**: Sykle 1.5 time med korte intervaller.
+"""
 
 PROPOSAL = """
 ## Plan for i morgen (2026-09-20)
@@ -33,3 +42,32 @@ def test_extract_from_proposal():
     assert ev["type"] == "Ride"
     assert ev["planned_duration"] == 60 * 60
     assert (ev["start_date_local"] or "").startswith("2026-09-20")
+
+
+def test_commit_typos_accepted():
+    for t in ("js", "jaa", "jepp", "kjør", "ja takk", "ok"):
+        assert is_commit_message(t), t
+
+
+def test_wants_full_plan():
+    assert wants_full_plan("legg inn hele planen")
+    assert wants_full_plan("kan du legge inn disse i intervals?")
+    assert not wants_full_plan("legg den inn i intervals")
+
+
+def test_extract_week_plan_multiple_days():
+    events = extract_week_plan_from_text(_MULTI_DAY_PLAN, as_of=date(2026, 9, 19))
+    by_date = {e["start_date_local"][:10]: e for e in events}
+    assert len(events) == 4
+    assert by_date["2026-09-19"]["type"] == "Run"
+    # «Sykle 1 time» -> Ride 60 min (ikke Workout/Coach-økt)
+    assert by_date["2026-09-20"]["type"] == "Ride"
+    assert by_date["2026-09-20"]["planned_duration"] == 60 * 60
+    assert by_date["2026-09-21"]["type"] == "Swim"
+    # «Sykle 1.5 time» -> 90 min (ikke 300)
+    assert by_date["2026-09-24"]["planned_duration"] == 90 * 60
+
+
+def test_extract_week_plan_needs_two_days():
+    single = "**20. september**: Løp 45 min."
+    assert len(extract_week_plan_from_text(single, as_of=date(2026, 9, 19))) == 1

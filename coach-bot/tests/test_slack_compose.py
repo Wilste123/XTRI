@@ -43,3 +43,21 @@ def test_natural_reply_is_plain_text():
     assert reply.blocks is None
     assert "##" not in reply.text
     assert "William" in reply.text
+
+
+def test_strip_denial_of_visuals():
+    raw = "Jeg kan ikke lage visuelle fremstillinger, men jeg kan beskrive det."
+    out = strip_self_denial(raw).lower()
+    assert "kan ikke lage visuelle" not in out
+
+
+def test_strip_false_action_claim():
+    raw = (
+        "Her er planen for uken.\n"
+        "Jeg legger inn disse øktene nå. Gi meg et øyeblikk!"
+    )
+    out = strip_self_denial(raw)
+    low = out.lower()
+    assert "planen for uken" in low
+    assert "legger inn disse øktene nå" not in low
+    assert "gi meg et øyeblikk" not in low
