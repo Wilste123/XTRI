@@ -23,3 +23,32 @@ Valider at filen ikke er tracket:
 ```bash
 git status   # skal ikke vise coach-bot/.env
 ```
+
+## Feilsøking: `SSL: CERTIFICATE_VERIFY_FAILED` (Mac)
+
+Typisk når Python er installert fra [python.org](https://www.python.org/downloads/) (f.eks. 3.13). Boten krasjer ved oppstart på `auth.test` mot Slack.
+
+**A – Anbefalt (engangsfix på Mac):**
+
+```bash
+/Applications/Python\ 3.13/Install\ Certificates.command
+```
+
+(Juster versjonstall hvis du bruker 3.12 osv. – mappen ligger under `/Applications/Python 3.x/`.)
+
+**B – Rask workaround (samme terminal som bot):**
+
+```bash
+cd coach-bot && source .venv/bin/activate
+export SSL_CERT_FILE=$(python -c "import certifi; print(certifi.where())")
+export REQUESTS_CA_BUNDLE="$SSL_CERT_FILE"
+python -m coach_bot.main
+```
+
+Nyere `scripts/start.sh` setter dette automatisk via `certifi` (transitiv avhengighet av `httpx`).
+
+**Verifiser:**
+
+```bash
+python -c "import urllib.request; urllib.request.urlopen('https://slack.com'); print('SSL ok')"
+```
