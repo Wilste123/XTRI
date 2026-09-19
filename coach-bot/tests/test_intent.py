@@ -1,11 +1,17 @@
 from coach_bot.intent import (
     Intent,
     asks_capabilities,
+    asks_for_charts,
     asks_for_plan_sync,
     detect_intent,
     strip_log_prefix,
     wants_week_plan_write,
 )
+
+
+def test_visual_request_is_chart():
+    assert asks_for_charts("kan du lage en visuell fremstilling av tiden fremover")
+    assert asks_for_charts("vis meg et diagram")
 
 
 def test_detect_status():
