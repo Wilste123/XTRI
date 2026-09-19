@@ -45,6 +45,15 @@ class Settings(BaseSettings):
 
     state_path: Path = Path("./data/coach_state.json")
 
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+
+    @property
+    def supabase_enabled(self) -> bool:
+        return bool(
+            self.supabase_url.strip() and self.supabase_service_role_key.strip()
+        )
+
     @field_validator("slack_mode")
     @classmethod
     def normalize_slack_mode(cls, v: str) -> str:

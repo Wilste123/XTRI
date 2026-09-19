@@ -80,6 +80,7 @@ Se [06_TESTRESULTATER.md](06_TESTRESULTATER.md) – **baseline ikke fullført en
 |---|--------|
 | GitHub | https://github.com/Wilste123/XTRI |
 | Intervals athlete | `i303008` (API key i lokal `.env` / Fly secrets – ikke i git) |
+| Supabase | CURRENT STATUS snapshots + chat (`SUPABASE_URL` / service role) |
 | Slack coach | **V3** – Socket Mode DM + proaktive meldinger ([docs/COACH_V3_USER_CHECKLIST.md](../docs/COACH_V3_USER_CHECKLIST.md)) |
 | Slack bruker (William) | `U0BSCE53YF2` |
 | Repo på Mac | `/Users/william/XTRI` |

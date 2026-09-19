@@ -12,6 +12,7 @@ from slack_sdk import WebClient
 
 from coach_bot.config import Settings
 from coach_bot.orchestrator import CoachOrchestrator
+from coach_bot.supabase_store import NullSupabaseStore, SupabaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ def _run_async_dm(
     client: WebClient,
     channel: str,
     thread_ts: str | None,
+    user_id: str,
+    db: SupabaseStore | NullSupabaseStore,
     fn: Callable[[], str],
 ) -> None:
     try:
@@ -61,6 +64,15 @@ def _run_async_dm(
         )
         result = fn()
         client.chat_postMessage(channel=channel, thread_ts=thread_ts, text=result)
+        if db.enabled:
+            db.append_message(
+                user_id,
+                "assistant",
+                result,
+                message_kind="chat",
+                slack_channel_id=channel,
+                thread_ts=thread_ts,
+            )
     except Exception as e:
         logger.exception("Coach DM failed")
         client.chat_postMessage(
@@ -74,7 +86,9 @@ def register_handlers(
     app: App,
     orchestrator: CoachOrchestrator,
     settings: Settings,
+    db: SupabaseStore | NullSupabaseStore | None = None,
 ) -> None:
+    store = db or NullSupabaseStore()
     allowed = settings.allowed_user_id_set
     client = WebClient(token=settings.slack_bot_token)
 
@@ -83,10 +97,31 @@ def register_handlers(
             return "Du har ikke tilgang til denne coach-boten."
         return None
 
-    def run_in_thread(channel: str, thread_ts: str | None, runner: Callable[[], str]) -> None:
+    def run_in_thread(
+        channel: str,
+        thread_ts: str | None,
+        user_id: str,
+        user_text: str,
+    ) -> None:
+        if store.enabled:
+            store.append_message(
+                user_id,
+                "user",
+                user_text,
+                message_kind="chat",
+                slack_channel_id=channel,
+                thread_ts=thread_ts,
+            )
         threading.Thread(
             target=_run_async_dm,
-            args=(client, channel, thread_ts, runner),
+            args=(
+                client,
+                channel,
+                thread_ts,
+                user_id,
+                store,
+                lambda: orchestrator.run_chat(user_text, slack_user_id=user_id),
+            ),
             daemon=True,
         ).start()
 
@@ -106,7 +141,7 @@ def register_handlers(
             return
         channel = event["channel"]
         thread_ts = event.get("thread_ts") or event.get("ts")
-        run_in_thread(channel, thread_ts, lambda: orchestrator.run_chat(text))
+        run_in_thread(channel, thread_ts, user_id, text)
 
     if settings.slack_enable_mentions:
 
@@ -123,7 +158,7 @@ def register_handlers(
                 text = "Gi en kort status."
             channel = event["channel"]
             thread_ts = event.get("thread_ts") or event.get("ts")
-            run_in_thread(channel, thread_ts, lambda: orchestrator.run_chat(text))
+            run_in_thread(channel, thread_ts, user_id, text)
 
     if not settings.slack_enable_slash:
         return

@@ -5,8 +5,9 @@
 | System | Source of truth |
 |--------|-----------------|
 | intervals.icu | Økter, wellness, belastning, kalenderplan (events) |
-| LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, beslutninger, strategi |
-| Slack | Brukergrensesnitt (V3: DM + proaktive meldinger; valgfri slash) |
+| LOFOTEN-2027/ | Mål, masterplan, beslutninger (git-arkiv) |
+| Supabase | CURRENT STATUS snapshots, Slack-historikk, økt-dedup |
+| Slack | Brukergrensesnitt (V3: DM + proaktive meldinger) |
 
 Rå økter lagres ikke som masse markdown i repo.
 
@@ -35,13 +36,14 @@ flowchart LR
 |---------|---------|
 | V1 | Slash commands, read-only repo |
 | V2 | `/logg` subjektive notater → repo (planlagt) |
-| V3 | **Socket DM chat, morgenbrief, ukentlig push, ny-økt-varsler** (Fly/local) |
+| V3 | **Socket DM chat, proaktiv push, Supabase minne** (Fly/local) |
 | V4 | Foreslå planendring → godkjenn → Intervals/repo |
 
 ## Porter (utvidelse)
 
 - `TrainingDataProvider` – Intervals i V1
 - `PlanProvider` – Intervals events
-- `ProjectMemory` – RepoReader
+- `ProjectMemory` – repo + Supabase status
+- `SupabaseStore` – snapshots, messages, activity dedup
 - `Notifier` – Slack
 - `Scheduler` – stub til V3

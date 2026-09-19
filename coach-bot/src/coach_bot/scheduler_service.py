@@ -29,14 +29,20 @@ class SchedulerService:
     def _send_morning(self) -> None:
         try:
             text = self._orchestrator.run_morning_brief()
-            self._notifier.broadcast(f"*God morgen – dagens coach*\n\n{text}")
+            self._notifier.broadcast(
+                f"*God morgen – dagens coach*\n\n{text}",
+                message_kind="morning_brief",
+            )
         except Exception:
             logger.exception("Morning brief failed")
 
     def _send_weekly(self) -> None:
         try:
             text = self._orchestrator.run_weekly_brief()
-            self._notifier.broadcast(f"*Ukentlig oppsummering*\n\n{text}")
+            self._notifier.broadcast(
+                f"*Ukentlig oppsummering*\n\n{text}",
+                message_kind="weekly_brief",
+            )
         except Exception:
             logger.exception("Weekly brief failed")
 

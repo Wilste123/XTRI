@@ -13,7 +13,7 @@ from coach_bot.aggregates import (
     format_hours_table,
 )
 from coach_bot.intervals_client import IntervalsClient
-from coach_bot.repo_reader import RepoReader
+from coach_bot.project_memory import ProjectMemory
 
 
 def _format_events(events: list[dict[str, Any]]) -> str:
@@ -59,7 +59,7 @@ def _format_wellness(rows: list[dict[str, Any]], limit: int = 7) -> str:
 
 
 class ContextBuilder:
-    def __init__(self, intervals: IntervalsClient, repo: RepoReader, tz: str) -> None:
+    def __init__(self, intervals: IntervalsClient, repo: ProjectMemory, tz: str) -> None:
         self._intervals = intervals
         self._repo = repo
         self._tz = tz

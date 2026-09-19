@@ -14,7 +14,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Lofoten coach manual jobs")
     parser.add_argument(
         "job",
-        choices=("morning", "weekly", "poll", "chat"),
+        choices=("morning", "weekly", "poll", "chat", "sync-status"),
         help="Job to run once",
     )
     parser.add_argument(
@@ -29,15 +29,24 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.job == "morning":
             text = services.orchestrator.run_morning_brief()
-            services.notifier.broadcast(f"*God morgen – dagens coach*\n\n{text}")
+            services.notifier.broadcast(
+                f"*God morgen – dagens coach*\n\n{text}",
+                message_kind="morning_brief",
+            )
         elif args.job == "weekly":
             text = services.orchestrator.run_weekly_brief()
-            services.notifier.broadcast(f"*Ukentlig oppsummering*\n\n{text}")
+            services.notifier.broadcast(
+                f"*Ukentlig oppsummering*\n\n{text}",
+                message_kind="weekly_brief",
+            )
         elif args.job == "poll":
             services.watcher.poll_once()
         elif args.job == "chat":
             text = services.orchestrator.run_chat(args.message)
-            services.notifier.broadcast(text)
+            services.notifier.broadcast(text, message_kind="chat")
+        elif args.job == "sync-status":
+            services.memory.import_status_from_repo()
+            print("Synced CURRENT_STATUS.md → Supabase coach_status_snapshots.")
         print(f"Job {args.job} completed.")
         return 0
     finally:

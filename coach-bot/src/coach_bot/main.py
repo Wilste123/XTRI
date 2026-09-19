@@ -26,7 +26,14 @@ def create_flask_app(services) -> Flask:
 
     @flask_app.route("/health", methods=["GET"])
     def health():
-        return jsonify({"ok": True, "service": "lofoten-coach", "mode": services.settings.slack_mode})
+        return jsonify(
+            {
+                "ok": True,
+                "service": "lofoten-coach",
+                "mode": services.settings.slack_mode,
+                "supabase": services.settings.supabase_enabled,
+            }
+        )
 
     return flask_app
 

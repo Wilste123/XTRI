@@ -12,6 +12,7 @@ from coach_bot.intervals_client import IntervalsClient, activity_id
 from coach_bot.orchestrator import CoachOrchestrator
 from coach_bot.slack_notifier import SlackNotifier
 from coach_bot.state_store import StateStore
+from coach_bot.supabase_store import NullSupabaseStore, SupabaseStore
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +25,14 @@ class ActivityWatcher:
         orchestrator: CoachOrchestrator,
         notifier: SlackNotifier,
         state: StateStore,
+        db: SupabaseStore | NullSupabaseStore | None = None,
     ) -> None:
         self._settings = settings
         self._intervals = intervals
         self._orchestrator = orchestrator
         self._notifier = notifier
         self._state = state
+        self._db = db or NullSupabaseStore()
         self._timer: threading.Timer | None = None
         self._stop = threading.Event()
 
@@ -55,27 +58,45 @@ class ActivityWatcher:
         return ids
 
     def bootstrap_if_needed(self) -> None:
+        ids = self._recent_activity_ids()
+        if self._db.enabled:
+            if self._db.is_activity_bootstrapped():
+                return
+            self._db.bootstrap_activities(ids)
+            logger.info("Supabase bootstrapped %s activity ids", len(ids))
+            return
         if self._state.is_bootstrapped():
             return
-        ids = self._recent_activity_ids()
         self._state.mark_bootstrapped(ids)
         logger.info("Bootstrapped activity state with %s recent ids", len(ids))
 
     def poll_once(self) -> None:
         self.bootstrap_if_needed()
         ids = self._recent_activity_ids()
-        new_ids = self._state.unseen_activity_ids(ids)
+        if self._db.enabled:
+            new_ids = self._db.new_activity_ids(ids)
+        else:
+            new_ids = self._state.unseen_activity_ids(ids)
         if not new_ids:
             return
-        if self._in_quiet_hours():
-            logger.info("Skipping %s new activities during quiet hours", len(new_ids))
+        quiet = self._in_quiet_hours()
+        if quiet:
+            logger.info("Quiet hours: marking %s activities seen without notify", len(new_ids))
+            for aid in new_ids:
+                if self._db.enabled:
+                    self._db.register_activity_seen(aid)
+                else:
+                    self._state.mark_notified(aid)
             return
         for aid in new_ids:
             try:
                 text = self._orchestrator.run_post_workout(aid)
                 header = f"*Ny økt registrert* (activity `{aid}`)\n\n"
-                self._notifier.broadcast(header + text)
-                self._state.mark_notified(aid)
+                self._notifier.broadcast(header + text, message_kind="post_workout")
+                if self._db.enabled:
+                    self._db.mark_activity_notified(aid)
+                else:
+                    self._state.mark_notified(aid)
             except Exception:
                 logger.exception("Post-workout notify failed for %s", aid)
 

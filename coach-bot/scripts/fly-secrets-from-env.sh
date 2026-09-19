@@ -43,4 +43,10 @@ fly secrets set \
   OPENAI_API_KEY="$OPENAI_API_KEY" \
   COACH_MODEL="${COACH_MODEL:-gpt-4o-mini}"
 
+if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+  fly secrets set \
+    SUPABASE_URL="$SUPABASE_URL" \
+    SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+fi
+
 echo "Fly secrets satt."
