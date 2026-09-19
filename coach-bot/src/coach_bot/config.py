@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     session_max_turns: int = 10
     session_db_path: Path = Path("data/sessions.db")
 
+    admin_briefing_secret: str = ""
+    intervals_max_bulk_events: int = 14
+
     @field_validator(
         "slack_bot_token",
         "slack_app_token",

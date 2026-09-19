@@ -7,7 +7,7 @@ import os
 import threading
 from pathlib import Path
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk import WebClient
@@ -27,7 +27,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_health_app(intervals: IntervalsClient, repo: RepoReader) -> Flask:
+def create_health_app(
+    intervals: IntervalsClient,
+    repo: RepoReader,
+    orchestrator: CoachOrchestrator | None = None,
+    settings=None,
+    slack_client: WebClient | None = None,
+) -> Flask:
     flask_app = Flask(__name__)
 
     @flask_app.route("/health", methods=["GET"])
@@ -54,6 +60,33 @@ def create_health_app(intervals: IntervalsClient, repo: RepoReader) -> Flask:
 
         return jsonify({"ok": ok, "checks": checks}), 200 if ok else 503
 
+    @flask_app.route("/admin/briefing", methods=["POST"])
+    def admin_briefing():
+        if not settings or not orchestrator or not slack_client:
+            return jsonify({"ok": False, "error": "not configured"}), 503
+        secret = settings.admin_briefing_secret.strip()
+        if not secret or request.headers.get("X-Admin-Secret") != secret:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+        btype = (request.args.get("type") or "test").lower()
+        user_ids = list(settings.allowed_user_id_set)
+        if not user_ids:
+            return jsonify({"ok": False, "error": "no ALLOWED_SLACK_USER_IDS"}), 400
+        from coach_bot.slack_post import deliver_coach_reply
+
+        for uid in user_ids:
+            if btype == "morning":
+                orchestrator.deliver_morning_briefing(slack_client, uid)
+            elif btype == "week":
+                orchestrator.deliver_weekly_briefing(slack_client, uid)
+            else:
+                deliver_coach_reply(
+                    slack_client,
+                    uid,
+                    orchestrator.run_chat("briefing: test", user_id=uid),
+                    label="Admin test",
+                )
+        return jsonify({"ok": True, "type": btype, "users": len(user_ids)})
+
     return flask_app
 
 
@@ -71,7 +104,15 @@ def main() -> None:
     llm = OpenAILlmClient(settings)
     sessions = SessionStore(db_path, settings.session_max_turns)
     repo_writer = RepoWriter(settings)
-    orchestrator = CoachOrchestrator(context, llm, sessions, repo_writer)
+    orchestrator = CoachOrchestrator(
+        context,
+        llm,
+        sessions,
+        repo_writer,
+        intervals=intervals,
+        repo=repo,
+        max_bulk_events=settings.intervals_max_bulk_events,
+    )
 
     bolt = App(
         token=settings.slack_bot_token,
@@ -93,7 +134,9 @@ def main() -> None:
 
     start_proactive_schedulers(settings, slack_client, orchestrator)
 
-    health_app = create_health_app(intervals, repo)
+    health_app = create_health_app(
+        intervals, repo, orchestrator, settings, slack_client=slack_client
+    )
     threading.Thread(
         target=lambda: health_app.run(
             host="0.0.0.0",

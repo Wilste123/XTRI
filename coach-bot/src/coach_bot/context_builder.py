@@ -127,12 +127,14 @@ class ContextBuilder:
         repo = self._repo.bundle_for_coach()
         phase = self._repo.detect_phase()
 
+        include_advanced = intent in (Intent.STATUS, Intent.WEEK, Intent.ANALYSIS, Intent.CHART)
         brief = build_coach_brief(
             snapshot,
             bundle,
             repo["current_status"],
             week_override=self._week_override,
             phase=phase,
+            include_advanced=include_advanced,
         )
         week_plan = self._repo.week_plan_excerpt(as_of_date=today)
 
@@ -160,7 +162,7 @@ class ContextBuilder:
                 ]
             )
 
-        if intent in (Intent.STATUS, Intent.GENERAL):
+        if intent in (Intent.STATUS, Intent.GENERAL, Intent.ANALYSIS, Intent.CHART):
             parts.append("## Gjennomført (Intervals)\n" + self._training_block(bundle, snapshot))
 
         if intent == Intent.RACE:

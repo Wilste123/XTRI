@@ -135,3 +135,35 @@ class IntervalsClient:
         self._cache_at = now
         self._cache_bundle = bundle
         return bundle
+
+    def invalidate_cache(self) -> None:
+        self._cache_bundle = None
+        self._cache_key = None
+        self._cache_at = 0.0
+
+    def bulk_upsert_events(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not events:
+            return []
+        r = self._client.post(
+            f"/athlete/{self._athlete_id}/events/bulk",
+            params={"upsert": "true"},
+            json=events,
+        )
+        r.raise_for_status()
+        self.invalidate_cache()
+        data = r.json()
+        if isinstance(data, list):
+            return data
+        return data.get("events") or data.get("data") or []
+
+    def create_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        created = self.bulk_upsert_events([event])
+        if created:
+            return created[0]
+        r = self._client.post(
+            f"/athlete/{self._athlete_id}/events",
+            json=event,
+        )
+        r.raise_for_status()
+        self.invalidate_cache()
+        return r.json()

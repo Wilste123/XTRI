@@ -29,3 +29,11 @@
 **Beslutning:** Konkurransedato satt til 20. august 2027 (Arctic Triple listing) inntil offisiell 2027-manual.
 
 **Begrunnelse:** Dokumentert på arrangørens 2027-eventside; verifiser ved påmelding.
+
+---
+
+### BESLUTNING – 2026-09-19
+
+**Beslutning:** Coach-bot kan skrive planlagte økter til Intervals via API. Hele uke krever bekreftelse (`ja`); enkeltøkt kan legges inn direkte.
+
+**Begrunnelse:** Kalender i Intervals er operativ plan; reduserer risiko for feil bulk-sync.

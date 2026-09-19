@@ -212,6 +212,108 @@ def plan_vs_actual(
     )
 
 
+def acwr_from_wellness(rows: list[dict[str, Any]]) -> float | None:
+    """Acute:chronic workload ratio (ATL/CTL) from latest wellness row."""
+    if not rows:
+        return None
+    last = rows[-1]
+    ctl = last.get("ctl") or last.get("fitness")
+    atl = last.get("atl") or last.get("fatigue")
+    if ctl is None or atl is None:
+        return None
+    c, a = float(ctl), float(atl)
+    if c <= 0:
+        return None
+    return round(a / c, 2)
+
+
+def discipline_balance_pct(summary: PeriodSummary) -> dict[str, float]:
+    total = summary.total_hours
+    if total <= 0:
+        return {}
+    return {k: round((v / total) * 100.0, 1) for k, v in summary.by_discipline_hours.items()}
+
+
+def consistency_stats(
+    activities: list[dict[str, Any]],
+    as_of: date,
+    lookback_days: int = 28,
+) -> dict[str, Any]:
+    start = as_of - timedelta(days=lookback_days - 1)
+    dates: set[date] = set()
+    for act in activities:
+        d = _parse_date(act.get("start_date_local") or act.get("start_date"))
+        if d is None or d < start or d > as_of:
+            continue
+        if activity_duration_seconds(act) > 0:
+            dates.add(d)
+    sorted_dates = sorted(dates)
+    longest_gap = 0
+    if len(sorted_dates) >= 2:
+        for i in range(1, len(sorted_dates)):
+            gap = (sorted_dates[i] - sorted_dates[i - 1]).days - 1
+            longest_gap = max(longest_gap, gap)
+    streak = 0
+    d = as_of
+    while d >= start:
+        if d in dates:
+            streak += 1
+            d -= timedelta(days=1)
+        else:
+            break
+    weeks = max(1, lookback_days // 7)
+    return {
+        "activity_days": len(dates),
+        "sessions_per_week": round(len(dates) / weeks, 1),
+        "longest_rest_gap_days": longest_gap,
+        "current_streak_days": streak,
+    }
+
+
+def plan_adherence(
+    events: list[dict[str, Any]],
+    activities: list[dict[str, Any]],
+    start: date,
+    end: date,
+) -> dict[str, int]:
+    week_events = filter_events_in_range(events, start, end)
+    act_dates: set[date] = set()
+    for act in activities:
+        d = _parse_date(act.get("start_date_local") or act.get("start_date"))
+        if d is not None and start <= d <= end and activity_duration_seconds(act) > 0:
+            act_dates.add(d)
+    matched = 0
+    for ev in week_events:
+        d = _parse_date(ev.get("start_date_local") or ev.get("start_date"))
+        if d is not None and d in act_dates:
+            matched += 1
+    return {
+        "planned_days": len(week_events),
+        "matched_days": matched,
+        "unmatched_planned": max(0, len(week_events) - matched),
+    }
+
+
+def intensity_load_per_hour(activities: list[dict[str, Any]], start: date, end: date) -> float | None:
+    total_sec = 0
+    total_tss = 0.0
+    for act in activities:
+        d = _parse_date(act.get("start_date_local") or act.get("start_date"))
+        if d is None or d < start or d > end:
+            continue
+        sec = activity_duration_seconds(act)
+        if sec <= 0:
+            continue
+        tss = act.get("icu_training_load") or act.get("training_load")
+        if tss is not None:
+            total_tss += float(tss)
+        total_sec += sec
+    if total_sec <= 0 or total_tss <= 0:
+        return None
+    hours = total_sec / 3600.0
+    return round(total_tss / hours, 1)
+
+
 def summarize_wellness_trends(rows: list[dict[str, Any]], limit: int = 7) -> str:
     if not rows:
         return ""

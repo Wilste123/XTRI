@@ -9,37 +9,10 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from slack_sdk import WebClient
 
 from coach_bot.config import Settings
-from coach_bot.errors import friendly_coach_error
 from coach_bot.orchestrator import CoachOrchestrator
+from coach_bot.slack_delivery import post_dm_to_users
 
 logger = logging.getLogger(__name__)
-
-
-def _open_dm_channel(client: WebClient, user_id: str) -> str:
-    resp = client.conversations_open(users=user_id)
-    return resp["channel"]["id"]
-
-
-def _send_to_users(
-    client: WebClient,
-    user_ids: list[str],
-    text: str,
-    label: str,
-) -> None:
-    for uid in user_ids:
-        try:
-            channel = _open_dm_channel(client, uid)
-            client.chat_postMessage(channel=channel, text=text)
-        except Exception as e:
-            logger.exception("%s failed for %s", label, uid)
-            try:
-                channel = _open_dm_channel(client, uid)
-                client.chat_postMessage(
-                    channel=channel,
-                    text=f"{label} feilet: {friendly_coach_error(e)}",
-                )
-            except Exception:
-                pass
 
 
 def _send_morning_briefing(
@@ -47,8 +20,8 @@ def _send_morning_briefing(
     orchestrator: CoachOrchestrator,
     user_ids: list[str],
 ) -> None:
-    text = orchestrator.run_morning_briefing()
-    _send_to_users(client, user_ids, text, "Morgenbriefing")
+    for uid in user_ids:
+        orchestrator.deliver_morning_briefing(client, uid)
 
 
 def _send_weekly_briefing(
@@ -56,8 +29,8 @@ def _send_weekly_briefing(
     orchestrator: CoachOrchestrator,
     user_ids: list[str],
 ) -> None:
-    text = orchestrator.run_weekly_briefing()
-    _send_to_users(client, user_ids, text, "Ukebriefing")
+    for uid in user_ids:
+        orchestrator.deliver_weekly_briefing(client, uid)
 
 
 def start_proactive_schedulers(
