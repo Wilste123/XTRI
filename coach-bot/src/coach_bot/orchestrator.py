@@ -147,6 +147,14 @@ class CoachOrchestrator:
         if sync_reply:
             return sync_reply
 
+        # Agentisk verktøy-løp: la modellen selv kalle verktøy (opprett økter,
+        # slå opp fagkunnskap, lage grafer, notere). Fallback til ren chat hvis
+        # LLM-klienten ikke støtter verktøy (f.eks. i eldre tester).
+        if callable(getattr(self._llm, "complete_agentic", None)) and self._intervals:
+            reply = self._run_agentic(text, intent, user_id)
+            self._remember(user_id, text, reply.text)
+            return reply
+
         history_messages = self._history_messages(user_id)
         ctx = self._context.for_chat(text, intent=intent)
         llm_text = self._llm.complete_chat(
@@ -188,6 +196,67 @@ class CoachOrchestrator:
                 reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + extra
 
         self._remember(user_id, text, reply.text)
+        return reply
+
+    def _run_agentic(self, text: str, intent: Intent, user_id: str) -> CoachReply:
+        """Let the model call tools (structured), then build the reply.
+
+        The model gets a grounded context + a set of tools. Write tools stage
+        events (pending) and are only committed after William says «ja». Charts
+        are attached when the model asks for them or for status/week intents.
+        """
+        from coach_bot.aggregates import build_training_snapshot
+        from coach_bot.tools import ToolContext, execute_tool, tool_schemas
+
+        tool_ctx = ToolContext(
+            intervals=self._intervals,
+            repo=self._repo,
+            context=self._context,
+            repo_writer=self._repo_writer,
+            sessions=self._sessions,
+            user_id=user_id,
+            tz=self._context._tz,
+        )
+
+        def _executor(name: str, arguments) -> str:
+            return execute_tool(name, arguments, tool_ctx)
+
+        base_context = self._context.for_chat(text, intent=intent)
+        history = self._history_messages(user_id) or None
+        final_text = self._llm.complete_agentic(
+            base_context,
+            text,
+            history_messages=history,
+            tools=tool_schemas(),
+            tool_executor=_executor,
+            intent=intent,
+        )
+        reply = natural_reply(final_text)
+
+        want_charts = tool_ctx.want_charts or intent in (
+            Intent.WEEK,
+            Intent.STATUS,
+            Intent.CHART,
+            Intent.ANALYSIS,
+        )
+        if want_charts and self._intervals:
+            bundle = self._intervals.fetch_coach_bundle()
+            snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
+            reply = self._attach_charts(reply, bundle, snap.as_of)
+
+        if tool_ctx.staged_events:
+            events = tool_ctx.staged_events
+            reply.blocks = (reply.blocks or []) + [
+                {"type": "divider"}
+            ] + week_preview_blocks(events)
+            if "svar «ja»" not in reply.text.lower() and "svar ja" not in reply.text.lower():
+                hvilke = "dem" if len(events) > 1 else "den"
+                reply.text += f"\n\nSvar «ja» for å legge {hvilke} inn i Intervals."
+        elif tool_ctx.staged_ops:
+            if tool_ctx.ops_preview and tool_ctx.ops_preview not in reply.text:
+                reply.text += f"\n\n{tool_ctx.ops_preview}"
+            if "svar «ja»" not in reply.text.lower() and "svar ja" not in reply.text.lower():
+                reply.text += "\n\nSvar «ja» for å bekrefte endringene i Intervals."
         return reply
 
     def _remember(self, user_id: str, user_msg: str, assistant_msg: str) -> None:
@@ -270,6 +339,28 @@ class CoachOrchestrator:
                 )
             except Exception as e:
                 return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+        if action_type == "intervals_ops":
+            ops = (payload or {}).get("ops") or [] if isinstance(payload, dict) else []
+            if not ops:
+                return CoachReply(text="Ingen ventende endringer.")
+            changed = 0
+            deleted = 0
+            errors = 0
+            for op in ops:
+                try:
+                    if op.get("op") == "delete" and op.get("id") is not None:
+                        self._intervals.delete_event(op["id"])
+                        deleted += 1
+                    elif op.get("op") == "upsert" and op.get("event"):
+                        self._intervals.bulk_upsert_events([op["event"]])
+                        changed += 1
+                except Exception:
+                    errors += 1
+            msg = f"Kalender oppdatert: {changed} endret, {deleted} slettet."
+            if errors:
+                msg += f" ({errors} feilet – sjekk logg.)"
+            return CoachReply(text=msg)
 
         return CoachReply(text="Ukjent ventende handling.")
 
