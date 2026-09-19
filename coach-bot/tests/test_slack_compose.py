@@ -1,4 +1,9 @@
-from coach_bot.slack_compose import compact_reply, sanitize_for_slack
+from coach_bot.slack_compose import (
+    compact_reply,
+    natural_reply,
+    sanitize_for_slack,
+    strip_self_denial,
+)
 
 
 def test_sanitize_strips_headings():
@@ -13,3 +18,28 @@ def test_compact_reply_short():
     assert reply.blocks is not None
     assert len(reply.blocks) <= 4
     assert "#" not in reply.text
+
+
+def test_strip_self_denial_replaces_refusal():
+    raw = (
+        "Beklager misforståelsen. Jeg kan ikke direkte legge inn økten i "
+        "Intervals.icu, men jeg kan gi deg instruksjoner."
+    )
+    out = strip_self_denial(raw)
+    assert "kan ikke" not in out.lower()
+    assert "beklager misforståelsen" not in out.lower()
+    assert "legg" in out.lower() or "ja" in out.lower()
+
+
+def test_strip_self_denial_keeps_normal_text():
+    raw = "Fin økt i dag. Du kan ikke øke volumet for fort nå, hold roen."
+    out = strip_self_denial(raw)
+    # «kan ikke øke» er legitim coaching og skal ikke fjernes.
+    assert "hold roen" in out.lower()
+
+
+def test_natural_reply_is_plain_text():
+    reply = natural_reply("## Status\n\nHei William, du ligger fint an denne uken.")
+    assert reply.blocks is None
+    assert "##" not in reply.text
+    assert "William" in reply.text
