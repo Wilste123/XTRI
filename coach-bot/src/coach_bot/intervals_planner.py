@@ -24,7 +24,9 @@ _SPORT_MAP = {
     "løp": "Run",
     "lop": "Run",
     "run": "Run",
+    "jogg": "Run",
     "sykkel": "Ride",
+    "sykl": "Ride",
     "bike": "Ride",
     "ride": "Ride",
     "svøm": "Swim",
@@ -33,6 +35,7 @@ _SPORT_MAP = {
     "styrke": "Workout",
     "strength": "Workout",
     "walk": "Walk",
+    "gåtur": "Walk",
 }
 
 
