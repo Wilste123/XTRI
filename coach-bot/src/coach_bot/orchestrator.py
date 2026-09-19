@@ -87,6 +87,11 @@ class CoachOrchestrator:
             self._remember(user_id, text, confirmed.text)
             return confirmed
 
+        if asks_capabilities(text) or (asks_for_charts(text) and asks_for_plan_sync(text)):
+            reply = self._reply_graphics_and_plan(text, user_id)
+            self._remember(user_id, text, reply.text)
+            return reply
+
         intent = detect_intent(text, has_history=has_history)
 
         if intent == Intent.LOG and self._repo_writer:
@@ -204,6 +209,42 @@ class CoachOrchestrator:
             )
         except Exception as e:
             return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+    def _reply_graphics_and_plan(self, text: str, user_id: str) -> CoachReply:
+        """Deterministic answer when user asks for charts + Intervals plan (avoids LLM «kan ikke»)."""
+        body = (
+            "Ja – grafer legges ved som bilder i denne tråden (CTL/ATL og disiplinvolum fra Intervals). "
+            "Ukeplan fra repo kan legges i Intervals-kalenderen etter forhåndsvisning – svar *ja* når du er fornøyd."
+        )
+        reply = CoachReply(
+            text=body,
+            blocks=briefing_blocks(
+                "Grafer og treningsplan",
+                body,
+                [
+                    (
+                        "Kommandoer",
+                        "• `ukestatus` eller `graf` – flere grafer\n"
+                        "• `synk kalender` – hele uken\n"
+                        "• `legg inn løp 45 min på tirsdag` – enkeltøkt",
+                    ),
+                ],
+            ),
+        )
+        if self._intervals:
+            bundle = self._intervals.fetch_coach_bundle()
+            from coach_bot.aggregates import build_training_snapshot
+
+            snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
+            reply = self._attach_charts(reply, bundle, snap.as_of)
+            if not reply.image_paths:
+                reply.text += "\n\n_(Grafer mangler – logg økter/wellness i Intervals først.)_"
+        sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
+        if sync:
+            reply.text += f"\n\n{sync.text}"
+            extra_blocks = sync.blocks or []
+            reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + extra_blocks
+        return reply
 
     def _handle_sync_week(self, text: str, user_id: str, intent: Intent) -> CoachReply | None:
         if intent != Intent.SYNC_WEEK or not self._repo or not self._sessions:

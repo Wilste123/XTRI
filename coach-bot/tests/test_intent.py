@@ -22,3 +22,10 @@ def test_detect_week():
 def test_detect_log():
     assert detect_intent("logg: kne 3/10") == Intent.LOG
     assert strip_log_prefix("logg: kne 3/10") == "kne 3/10"
+
+
+def test_grafer_og_treningsplan():
+    msg = "kan du ikke lage grafer og legge inn treningsplaner?"
+    assert asks_capabilities(msg)
+    assert asks_for_plan_sync(msg)
+    assert detect_intent(msg) == Intent.CHART
