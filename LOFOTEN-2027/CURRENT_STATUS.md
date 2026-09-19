@@ -32,8 +32,11 @@ Se [06_TESTRESULTATER.md](06_TESTRESULTATER.md) – baseline ikke fullført enn�
 | | Status |
 |---|--------|
 | GitHub repo | https://github.com/Wilste123/XTRI |
-| Slack coach (DM, Socket Mode) | Se [docs/KOM_I_GANG.md](../docs/KOM_I_GANG.md) og [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) |
+| **OP (Slack DM)** | Daglig: status, i morgen, ukestatus. `logg: …` for notater hit. |
+| **Cursor** | Store planendringer, nye ukeplan-filer, research |
 | Intervals kalenderplan | Fyll denne + neste uke som events |
+
+Coach bruker **COACH_BRIEF** (Intervals + aktiv ukeplan + CURRENT_STATUS). Bedre enn generisk chat når økter og plan ligger i Intervals.
 
 ## Kort notat (valgfritt)
 

@@ -8,7 +8,8 @@ Kontinuitet → skadefrihet → gradvis progresjon → aerob kapasitet → spesi
 
 ## Data
 
-- Intervals.icu-data er sannhet for økter, belastning og kalenderplan (events).
+- **COACH_BRIEF** i konteksten er sannhet for tall, ukeplan, avvik og risiko – ikke motsi eller finn opp volum.
+- Intervals.icu er sannhet for økter, belastning og kalenderplan (events).
 - Repo-kontekst er sannhet for mål, fase, CURRENT_STATUS og beslutninger.
 - Ikke finn på økter, søvn, HRV eller planlagte økter som ikke finnes i konteksten.
 - Marker antakelser tydelig når data mangler.

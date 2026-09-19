@@ -11,6 +11,8 @@ from coach_bot.aggregates import (
     filter_events_in_range,
     format_hours_table,
 )
+from coach_bot.coach_insights import build_coach_brief
+from coach_bot.intent import Intent
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.repo_reader import RepoReader
 
@@ -64,18 +66,29 @@ def _format_recent_activities(recent: list[dict[str, Any]]) -> str:
     for act in recent:
         tss = act.get("tss")
         tss_s = f", TSS={tss}" if tss else ""
+        hr = act.get("avg_hr")
+        hr_s = f", HR={hr}" if hr else ""
+        w = act.get("avg_watts")
+        w_s = f", W={w}" if w else ""
         lines.append(
             f"- {act.get('date')}: {act.get('type')} – {act.get('name')} "
-            f"({act.get('hours')} t{tss_s})"
+            f"({act.get('hours')} t{tss_s}{hr_s}{w_s})"
         )
     return "\n".join(lines)
 
 
 class ContextBuilder:
-    def __init__(self, intervals: IntervalsClient, repo: RepoReader, tz: str) -> None:
+    def __init__(
+        self,
+        intervals: IntervalsClient,
+        repo: RepoReader,
+        tz: str,
+        week_override: str | None = None,
+    ) -> None:
         self._intervals = intervals
         self._repo = repo
         self._tz = tz
+        self._week_override = week_override
 
     def _training_block(self, bundle: dict[str, Any], snapshot: Any) -> str:
         parts = [
@@ -98,7 +111,10 @@ class ContextBuilder:
         parts.append("\n## Wellness (siste dager)\n" + _format_wellness(bundle["wellness"]))
         return "\n".join(parts)
 
-    def for_chat(self) -> str:
+    def for_chat(self, user_message: str, intent: Intent | None = None) -> str:
+        from coach_bot.intent import detect_intent
+
+        intent = intent or detect_intent(user_message)
         bundle = self._intervals.fetch_coach_bundle(activity_days=28)
         snapshot = build_training_snapshot(bundle["activities"], tz=self._tz)
         today = snapshot.as_of
@@ -109,16 +125,56 @@ class ContextBuilder:
         events_today = filter_events_for_date(bundle["events"], today)
         events_week = filter_events_in_range(bundle["events"], start_week, today)
         repo = self._repo.bundle_for_coach()
+        phase = self._repo.detect_phase()
 
-        return (
-            "# Coach-kontekst (DM)\n\n"
-            f"## I dag ({today})\n{_format_events(events_today)}\n\n"
-            f"## I morgen ({tomorrow})\n{_format_events(events_tomorrow)}\n\n"
-            f"## Plan denne uken ({start_week} – {today})\n{_format_events(events_week)}\n\n"
-            "## Gjennomført (Intervals)\n"
-            + self._training_block(bundle, snapshot)
-            + "\n\n## Repo context\n"
-            + f"### CURRENT_STATUS\n{repo['current_status']}\n\n"
-            + f"### MASTERPLAN (utdrag)\n{repo['masterplan_excerpt']}\n\n"
-            + f"### DAGENS_NIVA (utdrag)\n{repo['dagens_niva_excerpt']}\n"
+        brief = build_coach_brief(
+            snapshot,
+            bundle,
+            repo["current_status"],
+            week_override=self._week_override,
+            phase=phase,
         )
+        week_plan = self._repo.week_plan_excerpt(as_of_date=today)
+
+        parts = [
+            "# Coach-kontekst (DM)",
+            f"Intent: {intent.value}",
+            "",
+            brief,
+            "",
+        ]
+
+        if intent in (Intent.TOMORROW, Intent.GENERAL, Intent.STATUS):
+            parts.extend(
+                [
+                    f"## I dag ({today})\n{_format_events(events_today)}\n",
+                    f"## I morgen ({tomorrow})\n{_format_events(events_tomorrow)}\n",
+                ]
+            )
+
+        if intent in (Intent.WEEK, Intent.STATUS, Intent.GENERAL):
+            parts.extend(
+                [
+                    f"## Plan denne uken ({start_week} – {today})\n{_format_events(events_week)}\n",
+                    "## Aktiv ukeplan (repo)\n" + week_plan + "\n",
+                ]
+            )
+
+        if intent in (Intent.STATUS, Intent.GENERAL):
+            parts.append("## Gjennomført (Intervals)\n" + self._training_block(bundle, snapshot))
+
+        if intent == Intent.RACE:
+            parts.append("### MASTERPLAN (utdrag)\n" + repo["masterplan_excerpt"] + "\n")
+
+        if intent in (Intent.STATUS, Intent.WEEK, Intent.GENERAL):
+            parts.append("### CURRENT_STATUS\n" + repo["current_status"] + "\n")
+            parts.append("### Treningsprogram (utdrag)\n" + repo["program_excerpt"] + "\n")
+            parts.append("### Tester\n" + repo["test_results_excerpt"] + "\n")
+
+        if intent == Intent.PAIN:
+            parts.append("### CURRENT_STATUS (flagg/smerte)\n" + repo["current_status"] + "\n")
+
+        if intent == Intent.GENERAL:
+            parts.append("### DAGENS_NIVA (utdrag)\n" + repo["dagens_niva_excerpt"] + "\n")
+
+        return "\n".join(parts)

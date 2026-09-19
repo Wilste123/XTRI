@@ -130,6 +130,8 @@ def build_training_snapshot(
                 "name": act.get("name") or act.get("type"),
                 "hours": round(sec / 3600.0, 2),
                 "tss": act.get("icu_training_load") or act.get("training_load"),
+                "avg_hr": act.get("average_heartrate") or act.get("avg_hr"),
+                "avg_watts": act.get("average_watts") or act.get("icu_average_watts"),
             }
         )
 
@@ -171,3 +173,60 @@ def filter_events_in_range(
         if d is not None and start <= d <= end:
             out.append(ev)
     return out
+
+
+@dataclass
+class PlanVsActual:
+    start: date
+    end: date
+    planned_event_count: int
+    planned_minutes: float
+    completed_activity_count: int
+    completed_hours: float
+
+
+def _event_minutes(ev: dict[str, Any]) -> float:
+    for key in ("moving_time", "duration", "planned_duration"):
+        val = ev.get(key)
+        if val is not None:
+            v = float(val)
+            return v / 60.0 if v > 500 else v
+    return 0.0
+
+
+def plan_vs_actual(
+    events: list[dict[str, Any]],
+    period: PeriodSummary,
+    start: date,
+    end: date,
+) -> PlanVsActual:
+    week_events = filter_events_in_range(events, start, end)
+    planned_mins = sum(_event_minutes(ev) for ev in week_events)
+    return PlanVsActual(
+        start=start,
+        end=end,
+        planned_event_count=len(week_events),
+        planned_minutes=planned_mins,
+        completed_activity_count=period.activity_count,
+        completed_hours=period.total_hours,
+    )
+
+
+def summarize_wellness_trends(rows: list[dict[str, Any]], limit: int = 7) -> str:
+    if not rows:
+        return ""
+    recent = rows[-limit:]
+    last = recent[-1]
+    ctl = last.get("ctl") or last.get("fitness")
+    atl = last.get("atl") or last.get("fatigue")
+    ramp = last.get("rampRate") or last.get("ramp_rate")
+    parts: list[str] = []
+    if ctl is not None:
+        parts.append(f"CTL={ctl}")
+    if atl is not None:
+        parts.append(f"ATL={atl}")
+    if ramp is not None:
+        parts.append(f"ramp={ramp}")
+    if not parts:
+        return "wellness uten CTL/ATL i Intervals"
+    return ", ".join(parts)

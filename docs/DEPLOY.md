@@ -1,27 +1,53 @@
-# Deploy – Lofoten Coach
+# Deploy – Lofoten Coach (always-on Socket Mode)
 
-## Lokal (anbefalt nå)
+Boten må kjøre **kontinuerlig** (Slack Socket Mode). Mac med `./scripts/start.sh` eller sky under.
+
+## Lokal
 
 ```bash
 cd coach-bot
-cp .env.example .env
 ./scripts/start.sh
 ```
 
-- `REPO_ROOT` = absolutt sti til XTRI-repo
-- Slack: Socket Mode (`SLACK_APP_TOKEN`) – **ingen tunnel**
+- `REPO_ROOT` = sti til XTRI-repo (inneholder `LOFOTEN-2027/`)
 - Health: `http://localhost:3000/health` og `/ready`
 
-## Docker (valgfritt)
+## Docker (fra repo-roten)
 
 ```bash
-cd coach-bot
-docker build -t lofoten-coach .
-docker run --env-file .env -p 3000:3000 -v /path/to/XTRI:/repo:ro lofoten-coach
+cd /path/to/XTRI
+docker build -f coach-bot/Dockerfile -t lofoten-coach .
+docker run --env-file coach-bot/.env -p 3000:3000 lofoten-coach
 ```
 
-Sett `REPO_ROOT=/repo` i container.
+Image baker inn `LOFOTEN-2027/` ved build (`REPO_ROOT=/app`). Oppdater plan i git → rebuild image.
 
-## Sky
+## Fly.io (anbefalt sky)
 
-For morgenbriefing og DM døgnet rundt: kjør container/VM med samme env. Hemmeligheter via platform secrets – aldri i git.
+Fra **repo-roten** (ikke bare `coach-bot/`):
+
+```bash
+cd /path/to/XTRI
+fly launch --config coach-bot/fly.toml --no-deploy
+fly secrets set \
+  SLACK_BOT_TOKEN=... \
+  SLACK_APP_TOKEN=... \
+  SLACK_SIGNING_SECRET=... \
+  ALLOWED_SLACK_USER_IDS=... \
+  INTERVALS_ATHLETE_ID=... \
+  INTERVALS_API_KEY=... \
+  OPENAI_API_KEY=...
+fly deploy --config coach-bot/fly.toml
+```
+
+- `fly.toml` setter `min_machines_running = 1` og health check på `/health`.
+- `REPO_ROOT=/app` er satt i `fly.toml` – matcher Dockerfile.
+- Endre `app = "lofoten-coach"` i `fly.toml` til unikt app-navn ved første `fly launch`.
+
+## Railway
+
+Connect repo, Dockerfile path `coach-bot/Dockerfile`, build context = repo root, start command `python -m coach_bot.main`, working directory `/app/coach-bot`, env som lokal `.env`, disable sleep on free tier or use paid always-on.
+
+## Hemmeligheter
+
+`coach-bot/.env` kan være tracket lokalt for test; i sky bruk `fly secrets` / Railway variables.
