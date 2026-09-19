@@ -18,6 +18,7 @@ Under **OAuth & Permissions** → Bot Token Scopes:
 - `im:history`
 - `im:read`
 - `im:write`
+- `reactions:write` (valgfritt – ⏳ mens coach tenker)
 
 Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN`.
 
