@@ -50,4 +50,6 @@ curl -X POST "http://localhost:3000/admin/briefing?type=test" \
 | Proaktiv sendes ikke | `ALLOWED_SLACK_USER_IDS`, briefing flags, alltid-på deploy |
 | Intervals-feil i svar | Athlete ID, API key (uten mellomrom i `.env`) |
 | Ingen grafer | Wellness/økter i Intervals; matplotlib installert |
+| Melding om files:write | Legg til scope, reinstall app, nytt bot token, restart bot |
+| DM: `legg inn ukeplanen` → `ja` | Hele uke fra repo til Intervals |
 | Lang ventetid | OpenAI; se terminal-logg |

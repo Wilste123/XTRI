@@ -14,16 +14,16 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 _INTENT_HINTS = {
     Intent.STATUS: (
-        "Gi LOFOTEN 2027 STATUS basert på COACH_BRIEF – ikke motsi tall der. "
-        "Start med én kort setning (hook), deretter punkter."
+        "Gi LOFOTEN 2027 STATUS fra COACH_BRIEF – ikke motsi tall. "
+        "Kort hook, maks 3 korte linjer, avslutt med Neste: … Ingen # overskrifter."
     ),
     Intent.TOMORROW: (
         "Fokus på i dag/i morgen. Hvis bruker vil i Intervals: gi konkret øktforslag med "
         "type, varighet (min/time) og struktur – systemet kan legge inn etter «ja»/«legg den inn»."
     ),
     Intent.WEEK: (
-        "UKESTATUS: gjennomført, belastning, bra/dårlig, risiko, endringer, neste uke. "
-        "Kort hook først."
+        "UKESTATUS fra COACH_BRIEF: kort hook, maks 3 linjer med fakta, Neste: … "
+        "Ingen # overskrifter eller lange lister."
     ),
     Intent.PAIN: "Ikke diagnostiser; vurder belastning fra data og anbefal lege ved behov.",
     Intent.RACE: "Race-strategi Lofoten Half Extreme; ikke Norseman-volum.",

@@ -18,9 +18,12 @@ Under **OAuth & Permissions** → Bot Token Scopes:
 - `im:history`
 - `im:read`
 - `im:write`
+- `files:write` (**påkrevd** for grafer/PNG i DM)
 - `reactions:write` (valgfritt – ⏳ mens coach tenker)
 
 Install app to workspace. Kopier **Bot User OAuth Token** → `SLACK_BOT_TOKEN`.
+
+**Viktig:** Etter du legger til nye scopes (f.eks. `files:write`), må du **Reinstall to Workspace** under OAuth & Permissions og oppdatere `SLACK_BOT_TOKEN` i `.env` / Fly secrets.
 
 ## 4. Signing secret
 
