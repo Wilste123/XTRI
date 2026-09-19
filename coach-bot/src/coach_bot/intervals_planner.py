@@ -134,6 +134,10 @@ def parse_single_workout_request(message: str, as_of: date) -> dict[str, Any] | 
     )
     if not any(k in lower for k in triggers):
         return None
+    # Krev en eksplisitt idrett i selve meldingen, ellers er dette en
+    # oppfølging som refererer til et tidligere forslag (håndteres et annet sted).
+    if not any(k in lower for k in _SPORT_MAP):
+        return None
     mins = _parse_minutes_message(lower)
     target = as_of
     if "i morgen" in lower or "imorgen" in lower:

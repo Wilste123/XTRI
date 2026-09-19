@@ -103,15 +103,24 @@ class CoachOrchestrator:
             self._remember(user_id, text, reply.text)
             return reply
 
-        write_reply = self._handle_intervals_write_followup(text, user_id)
-        if write_reply:
-            self._remember(user_id, text, write_reply.text)
-            return write_reply
-
+        # Kombinert «grafer + treningsplan»-spørsmål besvares deterministisk –
+        # før write-oppfølgeren, som ellers fanger «legge inn …» i teksten.
         if asks_capabilities(text) or (asks_for_charts(text) and asks_for_plan_sync(text)):
             reply = self._reply_graphics_and_plan(text, user_id)
             self._remember(user_id, text, reply.text)
             return reply
+
+        # Direkte enkeltøkt med eksplisitt idrett + varighet (f.eks.
+        # «legg inn sykkel 60 min i morgen») må opprettes direkte – før
+        # oppfølgings-håndtereren, som ellers fanger «legg inn …».
+        single_reply = self._handle_single_workout(text, user_id)
+        if single_reply:
+            return single_reply
+
+        write_reply = self._handle_intervals_write_followup(text, user_id)
+        if write_reply:
+            self._remember(user_id, text, write_reply.text)
+            return write_reply
 
         intent = detect_intent(text, has_history=has_history)
 
@@ -127,10 +136,6 @@ class CoachOrchestrator:
         sync_reply = self._handle_sync_week(text, user_id, intent)
         if sync_reply:
             return sync_reply
-
-        single_reply = self._handle_single_workout(text, user_id)
-        if single_reply:
-            return single_reply
 
         history_messages = self._history_messages(user_id)
         ctx = self._context.for_chat(text, intent=intent)
