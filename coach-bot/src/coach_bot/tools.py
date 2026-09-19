@@ -12,10 +12,10 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Callable
 
-from coach_bot import knowledge
+from coach_bot import knowledge, web_search
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,8 @@ class ToolContext:
     tz: str = "Europe/Oslo"
     want_charts: bool = False
     staged_events: list[dict[str, Any]] = field(default_factory=list)
+    staged_ops: list[dict[str, Any]] = field(default_factory=list)
+    ops_preview: str = ""
 
     def today(self) -> date:
         if self.intervals is not None:
@@ -58,9 +60,15 @@ class ToolContext:
         return date.today()
 
 
-def tool_schemas() -> list[dict[str, Any]]:
-    """OpenAI tool/function schemas the model may call."""
-    return [
+def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]:
+    """OpenAI tool/function schemas the model may call.
+
+    ``web_search`` is only advertised when a provider key is configured, so the
+    model doesn't waste a turn on an unavailable tool.
+    """
+    if web_search_enabled is None:
+        web_search_enabled = web_search.is_enabled()
+    schemas: list[dict[str, Any]] = [
         {
             "type": "function",
             "function": {
@@ -164,7 +172,79 @@ def tool_schemas() -> list[dict[str, Any]]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "adjust_load",
+                "description": (
+                    "Juster planlagt belastning i en periode med en prosent "
+                    "(negativ = lettere, positiv = tyngre). F.eks. «gjør uka 20% "
+                    "lettere» -> percent=-20. Endringer stages og krever «ja»."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "percent": {
+                            "type": "number",
+                            "description": "Endring i prosent, f.eks. -20 eller 15.",
+                        },
+                        "start_date": {"type": "string", "description": "ISO fra-dato (valgfri)"},
+                        "end_date": {"type": "string", "description": "ISO til-dato (valgfri)"},
+                    },
+                    "required": ["percent"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "move_workout",
+                "description": "Flytt planlagt(e) økt(er) fra én dato til en annen. Stages, krever «ja».",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "from_date": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                        "to_date": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                    },
+                    "required": ["from_date", "to_date"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "delete_workout",
+                "description": "Fjern planlagt(e) økt(er) på en dato. Stages, krever «ja».",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string", "description": "ISO YYYY-MM-DD"}
+                    },
+                    "required": ["date"],
+                },
+            },
+        },
     ]
+    if web_search_enabled:
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": (
+                        "Søk på nettet etter ferske eller uforutsette fakta som "
+                        "ikke er i fagkunnskapsbasen (nytt utstyr, race-oppdateringer, "
+                        "ny forskning). Bruk fagkunnskap først; web for det ukjente/nye."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string"}},
+                        "required": ["query"],
+                    },
+                },
+            }
+        )
+    return schemas
 
 
 def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
@@ -242,6 +322,129 @@ def _tool_render_charts(args: dict[str, Any], ctx: ToolContext) -> str:
     return "Grafer legges ved svaret (CTL/ATL og disiplinvolum)."
 
 
+def _parse_iso(value: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(value or "").strip()[:10])
+    except ValueError:
+        return None
+
+
+def _planned_events_in_range(ctx: ToolContext, start: date, end: date) -> list[dict[str, Any]]:
+    if ctx.intervals is None:
+        return []
+    try:
+        evs = ctx.intervals.get_events(start, end)
+    except Exception:  # pragma: no cover - defensive
+        return []
+    out = []
+    for e in evs or []:
+        d = _parse_iso((e.get("start_date_local") or e.get("start_date") or "")[:10])
+        if d is not None and start <= d <= end:
+            out.append(e)
+    return out
+
+
+def _event_duration_seconds(e: dict[str, Any]) -> int:
+    for k in ("planned_duration", "moving_time", "duration"):
+        v = e.get(k)
+        if v:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                pass
+    return 0
+
+
+def _stage_ops(ctx: ToolContext, ops: list[dict[str, Any]], preview: str) -> None:
+    ctx.staged_ops = ops
+    ctx.ops_preview = preview
+    if ctx.sessions and ctx.user_id:
+        ctx.sessions.set_pending(ctx.user_id, "intervals_ops", {"ops": ops})
+
+
+def _tool_adjust_load(args: dict[str, Any], ctx: ToolContext) -> str:
+    try:
+        percent = float(args.get("percent"))
+    except (TypeError, ValueError):
+        return "Trenger en prosent (f.eks. -20)."
+    today = ctx.today()
+    start = _parse_iso(args.get("start_date")) or today
+    end = _parse_iso(args.get("end_date")) or (start + timedelta(days=6))
+    evs = _planned_events_in_range(ctx, start, end)
+    if not evs:
+        return f"Fant ingen planlagte økter i {start}–{end} å justere."
+    factor = 1 + percent / 100.0
+    ops: list[dict[str, Any]] = []
+    lines: list[str] = []
+    for e in evs:
+        dur = _event_duration_seconds(e)
+        if dur <= 0:
+            continue
+        new = max(300, int(round(dur * factor / 60.0)) * 60)
+        patched = dict(e)
+        patched["planned_duration"] = new
+        ops.append({"op": "upsert", "event": patched})
+        lines.append(
+            f"- {(e.get('start_date_local') or '')[:10]}: {e.get('name')}: "
+            f"{dur // 60}→{new // 60} min"
+        )
+    if not ops:
+        return "Fant ingen økter med varighet å justere."
+    preview = "\n".join(lines)
+    _stage_ops(ctx, ops, preview)
+    retning = "lettere" if percent < 0 else "tyngre"
+    return (
+        f"Klargjort {len(ops)} økter {abs(percent):.0f}% {retning} "
+        f"(IKKE lagret ennå – venter på «ja»):\n{preview}"
+    )
+
+
+def _tool_move_workout(args: dict[str, Any], ctx: ToolContext) -> str:
+    frm = _parse_iso(args.get("from_date"))
+    to = _parse_iso(args.get("to_date"))
+    if not frm or not to:
+        return "Trenger gyldig fra- og til-dato (YYYY-MM-DD)."
+    evs = _planned_events_in_range(ctx, frm, frm)
+    if not evs:
+        return f"Fant ingen planlagt økt {frm} å flytte."
+    ops: list[dict[str, Any]] = []
+    lines: list[str] = []
+    for e in evs:
+        patched = dict(e)
+        patched["start_date_local"] = f"{to.isoformat()}T00:00:00"
+        ops.append({"op": "upsert", "event": patched})
+        lines.append(f"- {e.get('name')}: {frm} → {to}")
+    preview = "\n".join(lines)
+    _stage_ops(ctx, ops, preview)
+    return f"Klargjort flytting (venter på «ja»):\n{preview}"
+
+
+def _tool_delete_workout(args: dict[str, Any], ctx: ToolContext) -> str:
+    d = _parse_iso(args.get("date"))
+    if not d:
+        return "Trenger gyldig dato (YYYY-MM-DD)."
+    evs = _planned_events_in_range(ctx, d, d)
+    if not evs:
+        return f"Fant ingen planlagt økt {d} å slette."
+    ops: list[dict[str, Any]] = []
+    lines: list[str] = []
+    for e in evs:
+        eid = e.get("id")
+        if eid is None:
+            continue
+        ops.append({"op": "delete", "id": eid, "label": f"{d}: {e.get('name')}"})
+        lines.append(f"- slett {d}: {e.get('name')}")
+    if not ops:
+        return "Fant ingen økt med id å slette."
+    preview = "\n".join(lines)
+    _stage_ops(ctx, ops, preview)
+    return f"Klargjort sletting (venter på «ja»):\n{preview}"
+
+
+def _tool_web_search(args: dict[str, Any], ctx: ToolContext) -> str:
+    return web_search.search_web(args.get("query") or "")
+
+
 def _tool_log_note(args: dict[str, Any], ctx: ToolContext) -> str:
     note = (args.get("note") or "").strip()
     if not note:
@@ -262,6 +465,10 @@ _HANDLERS: dict[str, Callable[[dict[str, Any], ToolContext], str]] = {
     "render_charts": _tool_render_charts,
     "log_note": _tool_log_note,
     "create_workouts": _tool_create_workouts,
+    "adjust_load": _tool_adjust_load,
+    "move_workout": _tool_move_workout,
+    "delete_workout": _tool_delete_workout,
+    "web_search": _tool_web_search,
 }
 
 

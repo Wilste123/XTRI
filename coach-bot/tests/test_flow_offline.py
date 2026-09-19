@@ -86,6 +86,13 @@ class FakeIntervals:
         self.bulk.extend(events)
         return events
 
+    def get_events(self, oldest, newest):
+        return []
+
+    def delete_event(self, event_id):
+        self.deleted = getattr(self, "deleted", [])
+        self.deleted.append(event_id)
+
     def ping(self) -> None:
         return None
 
@@ -386,6 +393,25 @@ def test_agentic_charts_via_tool(orch):
     r = o.run_chat("vis formen min som graf", user_id="UC")
     # render_charts-verktøyet -> grafer vedlagt
     assert r.image_paths
+
+
+def test_intervals_ops_commit_on_ja(orch):
+    # Simuler at et verktøy har staged endringer (flytt + slett), så bekreft.
+    o = orch["orch"]
+    o._sessions.set_pending(
+        "UZ",
+        "intervals_ops",
+        {
+            "ops": [
+                {"op": "upsert", "event": {"id": 1, "name": "Løp", "start_date_local": "2026-09-21T00:00:00"}},
+                {"op": "delete", "id": 2, "label": "slett"},
+            ]
+        },
+    )
+    r = o.run_chat("ja", user_id="UZ")
+    assert "oppdatert" in r.text.lower()
+    assert orch["intervals"].bulk  # upsert utført
+    assert getattr(orch["intervals"], "deleted", []) == [2]  # delete utført
 
 
 def test_full_plan_write_from_chat(orch):

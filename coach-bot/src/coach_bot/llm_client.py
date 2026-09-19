@@ -43,11 +43,17 @@ _TOOL_GUIDE = (
     "- create_workouts: når William vil ha økter i kalenderen (én eller en hel "
     "uke). Oppgi ekte ISO-datoer (YYYY-MM-DD). Øktene opprettes FØRST når han "
     "bekrefter med «ja» – du staged dem.\n"
-    "- search_knowledge: slå opp fakta om trening/skade/ernæring/race før du gir "
-    "faglige råd, så du er presis og oppdatert.\n"
+    "- adjust_load: juster planlagt belastning i en periode med prosent (f.eks. "
+    "«gjør uka 20% lettere» -> percent=-20).\n"
+    "- move_workout / delete_workout: flytt eller fjern planlagte økter.\n"
+    "- search_knowledge: slå opp fagkunnskap (trening/skade/ernæring/race) FØR du "
+    "gir faglige råd – vær presis, på nivå med en topptrener, ikke overfladisk.\n"
+    "- web_search (hvis tilgjengelig): for ferske/uforutsette fakta som ikke er i "
+    "kunnskapsbasen (nytt utstyr, race-oppdateringer, ny forskning).\n"
     "- render_charts: når han vil se en graf eller visuell fremstilling.\n"
     "- log_note: når han rapporterer smerte/søvn/form som bør noteres.\n"
-    "Aldri si at du «ikke kan» noe av dette – bruk verktøyet."
+    "Alle kalender-endringer krever «ja» før de utføres. Aldri si at du «ikke "
+    "kan» noe av dette – bruk verktøyet."
 )
 
 

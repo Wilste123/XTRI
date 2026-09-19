@@ -252,6 +252,11 @@ class CoachOrchestrator:
             if "svar «ja»" not in reply.text.lower() and "svar ja" not in reply.text.lower():
                 hvilke = "dem" if len(events) > 1 else "den"
                 reply.text += f"\n\nSvar «ja» for å legge {hvilke} inn i Intervals."
+        elif tool_ctx.staged_ops:
+            if tool_ctx.ops_preview and tool_ctx.ops_preview not in reply.text:
+                reply.text += f"\n\n{tool_ctx.ops_preview}"
+            if "svar «ja»" not in reply.text.lower() and "svar ja" not in reply.text.lower():
+                reply.text += "\n\nSvar «ja» for å bekrefte endringene i Intervals."
         return reply
 
     def _remember(self, user_id: str, user_msg: str, assistant_msg: str) -> None:
@@ -334,6 +339,28 @@ class CoachOrchestrator:
                 )
             except Exception as e:
                 return CoachReply(text=f"Kunne ikke skrive til Intervals: {e}")
+
+        if action_type == "intervals_ops":
+            ops = (payload or {}).get("ops") or [] if isinstance(payload, dict) else []
+            if not ops:
+                return CoachReply(text="Ingen ventende endringer.")
+            changed = 0
+            deleted = 0
+            errors = 0
+            for op in ops:
+                try:
+                    if op.get("op") == "delete" and op.get("id") is not None:
+                        self._intervals.delete_event(op["id"])
+                        deleted += 1
+                    elif op.get("op") == "upsert" and op.get("event"):
+                        self._intervals.bulk_upsert_events([op["event"]])
+                        changed += 1
+                except Exception:
+                    errors += 1
+            msg = f"Kalender oppdatert: {changed} endret, {deleted} slettet."
+            if errors:
+                msg += f" ({errors} feilet – sjekk logg.)"
+            return CoachReply(text=msg)
 
         return CoachReply(text="Ukjent ventende handling.")
 
