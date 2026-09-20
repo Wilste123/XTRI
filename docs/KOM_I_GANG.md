@@ -28,7 +28,7 @@ Detaljer: [INTERVALS_QUICKSTART.md](INTERVALS_QUICKSTART.md)
 - [ ] Følg [SLACK_SETUP.md](SLACK_SETUP.md) (Socket Mode, scopes, `message.im`)
 - [ ] `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNING_SECRET`, `ALLOWED_SLACK_USER_IDS`
 - [ ] `REPO_ROOT` = absolutt sti til dette repoet
-- [ ] `cp coach-bot/.env.example coach-bot/.env` – **commit aldri `.env`**
+- [ ] `coach-bot/.env` ligger i git (prototype) – fyll tomme felter, se [ENV_TODO.md](../coach-bot/ENV_TODO.md)
 - [ ] `./coach-bot/scripts/start.sh`
 - [ ] `curl http://localhost:3000/ready`
 - [ ] Åpne DM med appen og skriv f.eks. «status»

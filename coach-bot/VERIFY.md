@@ -2,7 +2,7 @@
 
 ## Forutsetninger
 
-- [ ] `coach-bot/.env` komplett (inkl. `SLACK_APP_TOKEN`)
+- [ ] `coach-bot/.env` komplett — se [ENV_TODO.md](ENV_TODO.md) (inkl. `SLACK_APP_TOKEN`; `files:write`; GitHub/Tavily hvis du tester de features)
 - [ ] `./scripts/start.sh` kjører
 - [ ] `curl http://localhost:3000/ready` → `ok: true`
 - [ ] DM åpnet med appen i Slack

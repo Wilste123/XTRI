@@ -1,5 +1,13 @@
 # Logg – beslutninger og notater
 
+### NOTAT – 2026-09-20
+
+**Notat:** `coach-bot/ENV_TODO.md` er sjekklisten for miljøvariabler etter merge av PR #5–#13. Tracked `.env` fikk tomme felter for GitHub, Tavily, ukebriefing og admin-secret (defaults = feature av). Kjernetokens var allerede satt.
+
+**Hvorfor:** `main` på GitHub var oppdatert, men `.env` manglet nøkler for Atlas-synk, grafer (`files:write`), web-søk og Fly secrets.
+
+---
+
 ### BESLUTNING – 2026-09-20
 
 **Beslutning:** Langsiktig personlig hukommelse i `11_ATLAS.md` (Atlas). Coach lagrer varige fakta via verktøy + auto-læring fra DM; git/GitHub forblir source of truth (ikke Supabase for profil).
