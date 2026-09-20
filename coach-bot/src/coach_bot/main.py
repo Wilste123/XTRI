@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, request
@@ -161,9 +162,29 @@ def main() -> None:
     ).start()
     logger.info("Health on http://0.0.0.0:%s/health and /ready", settings.port)
 
-    handler = SocketModeHandler(bolt, settings.slack_app_token)
-    logger.info("Lofoten coach – Slack Socket Mode (DM)")
-    handler.start()
+    def _socket_mode_loop() -> None:
+        """Keep Fly /health alive even if App Token fails; retry Socket Mode."""
+        delay = 5
+        while True:
+            try:
+                handler = SocketModeHandler(bolt, settings.slack_app_token)
+                logger.info("Lofoten coach – Slack Socket Mode (DM)")
+                delay = 5
+                handler.start()
+            except Exception:
+                logger.exception(
+                    "Socket Mode failed (sjekk SLACK_APP_TOKEN xapp-… connections:write). "
+                    "Retry om %ss – /health fortsatt oppe.",
+                    delay,
+                )
+            time.sleep(delay)
+            delay = min(delay * 2, 120)
+
+    threading.Thread(target=_socket_mode_loop, name="slack-socket-mode", daemon=True).start()
+
+    # Block main thread so the process (and health server) stays up on Fly.
+    while True:
+        time.sleep(3600)
 
 
 if __name__ == "__main__":

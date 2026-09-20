@@ -106,7 +106,8 @@ Dockerfile kopierer **ikke** `.env`. Secrets må settes eksplisitt.
   - `files:write`-oppdatert bot token
   - **Ikke** importer `REPO_ROOT` fra `.env` (Mac-sti ødelegger ukeplan på Fly). `REPO_ROOT=/app` kommer fra `fly.toml` + Dockerfile.
 - [ ] Eksempel: `grep -v '^REPO_ROOT=' coach-bot/.env | fly secrets import -a lofoten-coach`
-- [ ] `cd coach-bot && fly deploy -a lofoten-coach --dockerfile Dockerfile --build-context ..`
+- [ ] Fra XTRI-roten: `./coach-bot/scripts/fly-deploy.sh` (fjerner `REPO_ROOT`-secret om den finnes, deployer, sjekker `/health`)
+- [ ] Secrets: `./coach-bot/scripts/fly-secrets-import.sh` (importerer `.env` **uten** `REPO_ROOT`)
 - [ ] Sjekk start-logg: `Morning briefing at 07:00 Europe/Oslo`
 - [ ] Ikke kjør lokal `start.sh` **og** Fly samtidig (to Socket Mode-klienter = duplikatsvar)
 

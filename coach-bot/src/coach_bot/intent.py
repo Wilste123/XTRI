@@ -211,10 +211,7 @@ def wants_week_plan_write(message: str) -> bool:
 
 def asks_capabilities(message: str) -> bool:
     """Natural questions like «kan du lage grafer og legge inn plan?»"""
-    lower = (message or "").lower()
     if asks_for_charts(message) and asks_for_plan_sync(message):
-        return True
-    if "kan du" in lower and any(p in lower for p in ("treningsplan", "ukeplan", "kalender")):
         return True
     return False
 

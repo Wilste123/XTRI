@@ -63,6 +63,104 @@ def _detect_type(text: str) -> str:
     return "Workout"
 
 
+def coach_external_id(event_date: date, sport: str) -> str:
+    return f"lofoten-coach-{event_date.isoformat()}-{sport.lower()}"
+
+
+def _parse_rpe_from_cells(*cells: str) -> float | None:
+    for cell in cells:
+        m = re.search(r"RPE\s*(\d+(?:\.\d+)?)", cell or "", re.I)
+        if m:
+            return float(m.group(1))
+        m = re.search(r"Z\s*(\d)", cell or "", re.I)
+        if m:
+            return float(m.group(1)) + 2.0
+    return None
+
+
+def estimate_planned_load(duration_min: int, rpe: float | None = None) -> int:
+    """Rough planned TSS/load for Intervals calendar events."""
+    r = rpe if rpe is not None else 5.0
+    return max(10, int(round(duration_min * r * 0.85)))
+
+
+def _collect_plan_rows(plan_md: str) -> list[dict[str, Any]]:
+    """Table rows in file order (Man … Søn), without calendar dates."""
+    rows: list[dict[str, Any]] = []
+    for line in plan_md.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        if "---" in line or "Dag" in line:
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        day_cell, workout_cell, duration_cell = cells[0], cells[1], cells[2]
+        intensity_cell = cells[3] if len(cells) > 3 else ""
+        day_key = day_cell.lower().strip()[:3]
+        if day_key not in _DAY_MAP:
+            continue
+        mins = _parse_duration_minutes(duration_cell) or _parse_duration_minutes(workout_cell)
+        if "fri" in workout_cell.lower() and (mins is None or mins <= 0):
+            continue
+        rows.append(
+            {
+                "workout_cell": workout_cell,
+                "duration_cell": duration_cell,
+                "intensity_cell": intensity_cell,
+                "mins": mins or 45,
+            }
+        )
+    return rows
+
+
+def events_from_repo_plan(
+    repo: RepoReader,
+    as_of: date | None = None,
+    *,
+    start_date: date | None = None,
+    skip_past: bool = True,
+) -> list[dict[str, Any]]:
+    """Map baseline/week table to consecutive days forward from start_date (default today)."""
+    today = as_of or date.today()
+    anchor = start_date or today
+    if anchor < today and skip_past:
+        anchor = today
+    ref = repo.active_training_week(today)
+    md = repo.read(ref.filename)
+    if md.startswith("(fil mangler"):
+        return []
+    events: list[dict[str, Any]] = []
+    for i, row in enumerate(_collect_plan_rows(md)):
+        event_date = anchor + timedelta(days=i)
+        if skip_past and event_date < today:
+            continue
+        workout_cell = row["workout_cell"]
+        mins = int(row["mins"])
+        sport = _detect_type(workout_cell)
+        rpe = _parse_rpe_from_cells(row.get("intensity_cell", ""), workout_cell)
+        load = estimate_planned_load(mins, rpe)
+        name = workout_cell[:80] or "Økt"
+        desc_parts = [workout_cell]
+        if row.get("intensity_cell"):
+            desc_parts.append(f"Intensitet: {row['intensity_cell']}")
+        desc_parts.append(f"Planlagt load ~{load} TSS (est.)")
+        events.append(
+            {
+                "category": "WORKOUT",
+                "type": sport,
+                "start_date_local": f"{event_date.isoformat()}T00:00:00",
+                "name": name,
+                "description": " · ".join(desc_parts)[:500],
+                "planned_duration": mins * 60,
+                "load": load,
+                "icu_training_load": load,
+                "external_id": coach_external_id(event_date, sport),
+            }
+        )
+    return events
+
+
 def parse_week_plan_table(plan_md: str, week_start: date) -> list[dict[str, Any]]:
     """Parse markdown table rows from ukeplan files."""
     events: list[dict[str, Any]] = []
@@ -87,7 +185,9 @@ def parse_week_plan_table(plan_md: str, week_start: date) -> list[dict[str, Any]
         name = workout_cell[:80] or "Økt"
         sport = _detect_type(workout_cell)
         start_local = f"{event_date.isoformat()}T00:00:00"
-        ext_id = f"lofoten-coach-{week_start.isoformat()}-{day_offset}"
+        event_date = week_start + timedelta(days=day_offset)
+        load = estimate_planned_load(mins)
+        ext_id = coach_external_id(event_date, sport)
         events.append(
             {
                 "category": "WORKOUT",
@@ -96,18 +196,25 @@ def parse_week_plan_table(plan_md: str, week_start: date) -> list[dict[str, Any]
                 "name": name,
                 "description": workout_cell,
                 "planned_duration": mins * 60,
+                "load": load,
+                "icu_training_load": load,
                 "external_id": ext_id,
             }
         )
     return events
 
 
-def events_for_active_week(repo: RepoReader, as_of: date | None = None) -> list[dict[str, Any]]:
+def events_for_active_week(
+    repo: RepoReader,
+    as_of: date | None = None,
+    *,
+    start_date: date | None = None,
+    skip_past: bool = True,
+) -> list[dict[str, Any]]:
     today = as_of or date.today()
-    ref = repo.active_training_week(today)
-    md = repo.read(ref.filename)
-    week_start = _monday_of_week(today)
-    return parse_week_plan_table(md, week_start)
+    return events_from_repo_plan(
+        repo, today, start_date=start_date, skip_past=skip_past
+    )
 
 
 def scale_events_duration(events: list[dict[str, Any]], percent: float) -> list[dict[str, Any]]:
@@ -189,5 +296,7 @@ def parse_single_workout_request(message: str, as_of: date) -> dict[str, Any] | 
         "name": name,
         "description": message.strip()[:500],
         "planned_duration": mins * 60,
-        "external_id": f"lofoten-coach-single-{target.isoformat()}-{mins}",
+        "external_id": coach_external_id(target, sport),
+        "load": estimate_planned_load(mins),
+        "icu_training_load": estimate_planned_load(mins),
     }

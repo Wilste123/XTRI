@@ -6,7 +6,7 @@ import logging
 from datetime import date
 
 from coach_bot.config import Settings
-from coach_bot.intervals_planner import _monday_of_week, parse_week_plan_table
+from coach_bot.intervals_planner import events_from_repo_plan
 from coach_bot.repo_reader import RepoReader
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,7 @@ def check_week_plan(repo: RepoReader, settings: Settings) -> None:
             settings.lofoten_dir,
         )
         return
-    week_start = _monday_of_week(date.today())
-    events = parse_week_plan_table(md, week_start)
+    events = events_from_repo_plan(repo, date.today(), skip_past=False)
     if not events:
         logger.warning(
             "Ukeplan %s parse=0 events (REPO_ROOT=%s). Sjekk tabellformat i markdown.",

@@ -226,6 +226,8 @@ def test_week_sync_preview_then_confirm(orch):
     # Forhåndsvisning vises (kompakt UX lister økter + «ja»-instruks); ingen skriv ennå.
     assert preview.text.strip()
     assert "ja" in preview.text.lower()
+    assert "2026-09-14" not in preview.text
+    assert "2026-09-18" in preview.text or "2026-09-19" in preview.text
     assert not orch["intervals"].bulk  # ingenting skrevet før bekreftelse
     confirm = o.run_chat("ja", user_id="U2")
     assert "Lagt inn" in confirm.text
@@ -402,6 +404,15 @@ class ToolCallingLlm(FakeLlm):
             tool_executor("render_charts", {})
             return "Her kommer grafene."
         return "Alt vel – hva vil du ta tak i?"
+
+
+def test_ja_without_pending_skips_agentic(orch):
+    o = orch["orch"]
+    o._llm = ToolCallingLlm()
+    r = o.run_chat("ja", user_id="U_NO_PENDING")
+    assert "Ingen ventende plan" in r.text
+    assert not orch["intervals"].bulk
+    assert not o._sessions.get_pending("U_NO_PENDING")
 
 
 def test_agentic_creates_plan_via_tool(orch):
