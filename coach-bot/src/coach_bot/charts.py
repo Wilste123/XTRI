@@ -31,14 +31,27 @@ def _wellness_series(rows: list[dict[str, Any]], limit: int = 28) -> tuple[list[
     return labels, ctl, atl
 
 
-def render_ctl_atl_chart(rows: list[dict[str, Any]], title: str = "Belastning (CTL / ATL)") -> Path | None:
+def chart_theme_from_message(message: str) -> dict[str, str]:
+    lower = (message or "").lower()
+    if "rosa" in lower or "pink" in lower:
+        return {"ctl": "#db2777", "atl": "#f472b6"}
+    return {}
+
+
+def render_ctl_atl_chart(
+    rows: list[dict[str, Any]],
+    title: str = "Belastning (CTL / ATL)",
+    *,
+    ctl_color: str = "#2563eb",
+    atl_color: str = "#dc2626",
+) -> Path | None:
     labels, ctl, atl = _wellness_series(rows)
     if len(ctl) < 2:
         return None
     fig, ax = plt.subplots(figsize=(7, 3.2), dpi=120)
     x = range(len(ctl))
-    ax.plot(x, ctl, label="CTL", color="#2563eb", linewidth=2)
-    ax.plot(x, atl, label="ATL", color="#dc2626", linewidth=2, alpha=0.85)
+    ax.plot(x, ctl, label="CTL", color=ctl_color, linewidth=2)
+    ax.plot(x, atl, label="ATL", color=atl_color, linewidth=2, alpha=0.85)
     ax.set_xticks(list(x)[:: max(1, len(x) // 6)])
     ax.set_xticklabels([labels[i] for i in ax.get_xticks().astype(int) if i < len(labels)], fontsize=8)
     ax.set_title(title, fontsize=11)

@@ -3,6 +3,7 @@ from coach_bot.intent import (
     asks_capabilities,
     asks_for_charts,
     asks_for_plan_sync,
+    asks_to_create_week_plan,
     detect_intent,
     strip_log_prefix,
     wants_week_plan_write,
@@ -41,4 +42,18 @@ def test_grafer_og_treningsplan():
 def test_week_plan_phrases():
     msg = "legg inn ukeplanen i intervals"
     assert asks_for_plan_sync(msg)
+    assert wants_week_plan_write(msg)
+
+
+def test_rosa_graf_not_capabilities_with_plan():
+    msg = "kan du lage en rosa graf for uken som har gått?"
+    assert asks_for_charts(msg)
+    assert not asks_for_plan_sync(msg)
+    assert not asks_capabilities(msg)
+    assert detect_intent(msg) == Intent.CHART
+
+
+def test_lag_ukeplan_create_flag():
+    msg = "lag en ukeplan og legg inn ukeplanen i intervals"
+    assert asks_to_create_week_plan(msg)
     assert wants_week_plan_write(msg)

@@ -214,8 +214,14 @@ def asks_capabilities(message: str) -> bool:
     lower = (message or "").lower()
     if asks_for_charts(message) and asks_for_plan_sync(message):
         return True
-    if "kan du" in lower and asks_for_charts(message):
-        return True
     if "kan du" in lower and any(p in lower for p in ("treningsplan", "ukeplan", "kalender")):
         return True
     return False
+
+
+def asks_to_create_week_plan(message: str) -> bool:
+    """User wants the coach to compose a week (not only sync existing markdown)."""
+    lower = (message or "").lower()
+    if "ukeplan" not in lower:
+        return False
+    return any(k in lower for k in ("lag en", "lage en", "lag ukeplan", "lage ukeplan", "lag min"))

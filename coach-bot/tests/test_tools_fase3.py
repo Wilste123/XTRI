@@ -1,8 +1,14 @@
 import os
+import shutil
 from datetime import date
+from pathlib import Path
 
 from coach_bot import web_search
+from coach_bot.config import Settings
+from coach_bot.repo_reader import RepoReader
 from coach_bot.tools import ToolContext, execute_tool, tool_schemas
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _Sessions:
@@ -69,10 +75,39 @@ def test_delete_workout_stages_delete():
     assert ctx.staged_ops[0] == {"op": "delete", "id": 9, "label": "2026-09-20: Svøm"}
 
 
+def test_delete_workout_filters_by_sport():
+    events = [
+        {"id": 1, "type": "Ride", "start_date_local": "2026-09-21T00:00:00", "name": "Sykkelintervall"},
+        {"id": 2, "type": "Run", "start_date_local": "2026-09-21T00:00:00", "name": "Løp 75 min"},
+    ]
+    ctx = _ctx(events)
+    execute_tool("delete_workout", {"date": "2026-09-21", "sport": "sykkel"}, ctx)
+    assert len(ctx.staged_ops) == 1
+    assert ctx.staged_ops[0]["id"] == 1
+
+
 def test_adjust_load_no_events():
     ctx = _ctx([])
     out = execute_tool("adjust_load", {"percent": -10}, ctx)
-    assert "ingen planlagte" in out.lower()
+    assert "synk kalender" in out.lower()
+
+
+def test_adjust_load_repo_fallback(tmp_path):
+    shutil.copytree(REPO_ROOT / "LOFOTEN-2027", tmp_path / "LOFOTEN-2027")
+    settings = Settings(
+        slack_bot_token="x",
+        slack_app_token="x",
+        slack_signing_secret="x",
+        intervals_athlete_id="i1",
+        intervals_api_key="k",
+        openai_api_key="k",
+        repo_root=tmp_path,
+    )
+    repo = RepoReader(settings)
+    ctx = ToolContext(intervals=_Intervals([]), repo=repo, sessions=_Sessions(), user_id="U1")
+    out = execute_tool("adjust_load", {"percent": -20}, ctx)
+    assert "repo" in out.lower()
+    assert ctx.sessions.pending["U1"][0] == "intervals_week"
 
 
 def test_web_search_unconfigured(monkeypatch):

@@ -70,8 +70,19 @@ class Settings(BaseSettings):
         return v
 
     @property
+    def effective_repo_root(self) -> Path:
+        """Prefer a root that actually contains LOFOTEN-2027 (Fly vs local .env)."""
+        root = self.repo_root.expanduser()
+        if (root / "LOFOTEN-2027").is_dir():
+            return root
+        container = Path("/app")
+        if (container / "LOFOTEN-2027").is_dir():
+            return container
+        return root
+
+    @property
     def lofoten_dir(self) -> Path:
-        return self.repo_root / "LOFOTEN-2027"
+        return self.effective_repo_root / "LOFOTEN-2027"
 
     @property
     def allowed_user_id_set(self) -> set[str]:

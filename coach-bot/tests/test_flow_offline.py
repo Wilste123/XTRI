@@ -206,14 +206,17 @@ def test_log_writes_to_current_status(orch):
     assert "kne 3/10 etter løp" in txt
 
 
-def test_direct_single_workout_creates_event(orch):
-    r = orch["orch"].run_chat("legg inn sykkel 60 min i morgen", user_id="U1")
-    assert "Lagt inn i Intervals" in r.text
+def test_direct_single_workout_preview_then_confirm(orch):
+    o = orch["orch"]
+    preview = o.run_chat("legg inn sykkel 60 min i morgen", user_id="U1")
+    assert "ja" in preview.text.lower()
+    assert not orch["intervals"].created
+    confirm = o.run_chat("ja", user_id="U1")
+    assert "Lagt inn i Intervals" in confirm.text
     created = orch["intervals"].created
     assert len(created) == 1
     assert created[0]["type"] == "Ride"
     assert created[0]["planned_duration"] == 60 * 60
-    # i morgen relativt til TODAY (2026-09-18)
     assert created[0]["start_date_local"].startswith("2026-09-19")
 
 
@@ -258,6 +261,41 @@ def test_capabilities_charts_and_plan(orch):
     assert r.image_paths  # grafer vedlagt
     # Forhåndsvisning av ukeplan lagt til
     assert "Forhåndsvisning" in r.text or "ukeplan" in r.text.lower()
+
+
+def test_rosa_graf_without_week_sync_noise(orch):
+    r = orch["orch"].run_chat(
+        "kan du lage en rosa graf for uken som har gått?", user_id="U10"
+    )
+    assert "Ingen ukeplan" not in r.text
+    assert r.image_paths
+
+
+def test_sync_week_missing_file_message(tmp_path):
+    lof = tmp_path / "LOFOTEN-2027"
+    lof.mkdir()
+    shutil.copy(REPO_ROOT / "LOFOTEN-2027" / "CURRENT_STATUS.md", lof / "CURRENT_STATUS.md")
+    settings = Settings(
+        slack_bot_token="x",
+        slack_app_token="x",
+        slack_signing_secret="x",
+        intervals_athlete_id="i1",
+        intervals_api_key="k",
+        openai_api_key="k",
+        repo_root=tmp_path,
+    )
+    intervals = FakeIntervals(_load_activities(), _wellness_rows())
+    repo = RepoReader(settings)
+    o = CoachOrchestrator(
+        ContextBuilder(intervals, repo, settings.tz),
+        FakeLlm(),
+        SessionStore(tmp_path / "s.db", 10),
+        RepoWriter(settings),
+        intervals=intervals,
+        repo=repo,
+    )
+    r = o.run_chat("synk kalender", user_id="U11")
+    assert "REPO_ROOT" in r.text or "fil mangler" in r.text.lower()
 
 
 def test_deliver_briefings_via_slack(orch):
