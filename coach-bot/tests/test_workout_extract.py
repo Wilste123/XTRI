@@ -2,9 +2,12 @@ from datetime import date
 
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
+    extract_week_plan_from_assistant,
+    extract_week_plan_from_markdown_table,
     extract_week_plan_from_text,
     extract_workout_from_text,
     is_commit_message,
+    is_commit_only_message,
     wants_full_plan,
     wants_intervals_write,
 )
@@ -71,3 +74,41 @@ def test_extract_week_plan_multiple_days():
 def test_extract_week_plan_needs_two_days():
     single = "**20. september**: Løp 45 min."
     assert len(extract_week_plan_from_text(single, as_of=date(2026, 9, 19))) == 1
+
+
+_BASE0_TABLE = """
+Ukeplan (2026-09-21 – 2026-09-27)
+
+| Dag | Økt | Varighet | Intensitet | Hensikt |
+| --- | --- | ---: | --- | --- |
+| Man | Hvilepuls noteres. Valgfritt: lett styrke 20 min (aktivering) | 0–30 min | RPE 3–4 | Referanse |
+| Tir | Oppvarming · **20 min jevn løp** (test) · nedjogg | 45–55 min | RPE 6–7 | Løp |
+| Ons | drill · **8×100 m** · svøm | 45–60 min | RPE 5–7 | Svøm |
+| Tor | Hvile **eller** sykkel 30–45 min rolig | 0–45 min | RPE 3–4 | Recovery |
+| Fre | **20 min steady sykkel** | 60–75 min | RPE 6–7 | Sykkel |
+| Lør | Sykkel 60–90 min · **10–15 min løp** (brick) | 75–105 min | RPE 4–5 | Brick |
+| Søn | Fri / rolig gåtur | — | — | Rest |
+
+Denne planen holder seg innenfor volummålet på 3–5 timer for uken.
+"""
+
+
+def test_extract_markdown_table_week_not_single_300min_sykkel():
+    events = extract_week_plan_from_markdown_table(
+        _BASE0_TABLE, as_of=date(2026, 9, 20)
+    )
+    assert len(events) >= 4
+    dates = {(e["start_date_local"] or "")[:10] for e in events}
+    assert "2026-09-22" in dates
+    assert all(e["planned_duration"] <= 240 * 60 for e in events)
+    bad = extract_workout_from_text(_BASE0_TABLE, as_of=date(2026, 9, 20))
+    assert bad is None or bad["planned_duration"] < 300 * 60
+
+
+def test_legg_den_inn_not_commit_only():
+    assert not is_commit_only_message("legg den inn i intervalls")
+
+
+def test_extract_week_plan_from_assistant_prefers_table():
+    events = extract_week_plan_from_assistant(_BASE0_TABLE, as_of=date(2026, 9, 20))
+    assert len(events) >= 4
