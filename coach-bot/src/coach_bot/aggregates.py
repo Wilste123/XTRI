@@ -186,12 +186,10 @@ class PlanVsActual:
 
 
 def _event_minutes(ev: dict[str, Any]) -> float:
-    for key in ("moving_time", "duration", "planned_duration"):
-        val = ev.get(key)
-        if val is not None:
-            v = float(val)
-            return v / 60.0 if v > 500 else v
-    return 0.0
+    from coach_bot.event_duration import event_duration_seconds
+
+    sec = event_duration_seconds(ev)
+    return sec / 60.0 if sec > 0 else 0.0
 
 
 def plan_vs_actual(

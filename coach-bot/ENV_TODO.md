@@ -98,13 +98,15 @@ Morgenbriefing er på. Ukebriefing er **av** (beslutning 2026-09-20).
 Dockerfile kopierer **ikke** `.env`. Secrets må settes eksplisitt.
 
 - [ ] `fly launch --config coach-bot/fly.toml --no-deploy` (første gang)
-- [ ] Sett secrets (se [../docs/DEPLOY.md](../docs/DEPLOY.md)), minst:
+- [ ] Sett secrets (se [SETUP_ENV.md](SETUP_ENV.md)), minst:
   - alle Slack + Intervals + OpenAI
   - `MORNING_BRIEFING_ENABLED=true`
   - `GITHUB_TOKEN` + `GITHUB_REPO=Wilste123/XTRI` + `MEMORY_AUTO_LEARN=true`
   - `TAVILY_API_KEY` hvis du vil ha web-søk
   - `files:write`-oppdatert bot token
-- [ ] `fly deploy --config coach-bot/fly.toml`
+  - **Ikke** importer `REPO_ROOT` fra `.env` (Mac-sti ødelegger ukeplan på Fly). `REPO_ROOT=/app` kommer fra `fly.toml` + Dockerfile.
+- [ ] Eksempel: `grep -v '^REPO_ROOT=' coach-bot/.env | fly secrets import -a lofoten-coach`
+- [ ] `cd coach-bot && fly deploy -a lofoten-coach --dockerfile Dockerfile --build-context ..`
 - [ ] Sjekk start-logg: `Morning briefing at 07:00 Europe/Oslo`
 - [ ] Ikke kjør lokal `start.sh` **og** Fly samtidig (to Socket Mode-klienter = duplikatsvar)
 

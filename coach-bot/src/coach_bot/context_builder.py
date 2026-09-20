@@ -15,6 +15,7 @@ from coach_bot.coach_insights import build_coach_brief
 from coach_bot.intent import Intent
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot import atlas
+from coach_bot.event_duration import format_event_duration
 from coach_bot.repo_reader import RepoReader
 
 
@@ -26,8 +27,7 @@ def _format_events(events: list[dict[str, Any]]) -> str:
         d = (ev.get("start_date_local") or ev.get("start_date") or "")[:10]
         name = ev.get("name") or ev.get("category") or "Økt"
         desc = ev.get("description") or ""
-        mins = ev.get("moving_time")
-        dur = f", {int(mins) // 60} min" if mins else ""
+        dur = format_event_duration(ev)
         lines.append(f"- {d}: {name}{dur} {desc[:120]}".strip())
     if len(events) > 20:
         lines.append(f"... +{len(events) - 20} flere")

@@ -110,6 +110,23 @@ def events_for_active_week(repo: RepoReader, as_of: date | None = None) -> list[
     return parse_week_plan_table(md, week_start)
 
 
+def scale_events_duration(events: list[dict[str, Any]], percent: float) -> list[dict[str, Any]]:
+    """Return copies of events with planned_duration adjusted by percent."""
+    from coach_bot.event_duration import event_duration_seconds
+
+    factor = 1 + percent / 100.0
+    out: list[dict[str, Any]] = []
+    for e in events:
+        dur = event_duration_seconds(e)
+        if dur <= 0:
+            continue
+        new = max(300, int(round(dur * factor / 60.0)) * 60)
+        patched = dict(e)
+        patched["planned_duration"] = new
+        out.append(patched)
+    return out
+
+
 def _parse_minutes_message(lower: str) -> int:
     m = re.search(r"(\d+)\s*min", lower)
     if m:

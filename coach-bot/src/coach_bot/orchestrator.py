@@ -9,7 +9,11 @@ from slack_sdk import WebClient
 
 logger = logging.getLogger(__name__)
 
-from coach_bot.charts import render_ctl_atl_chart, render_discipline_week_chart
+from coach_bot.charts import (
+    chart_theme_from_message,
+    render_ctl_atl_chart,
+    render_discipline_week_chart,
+)
 from coach_bot.coach_reply import CoachReply
 from coach_bot.context_builder import ContextBuilder
 from coach_bot.intent import (
@@ -17,12 +21,17 @@ from coach_bot.intent import (
     asks_capabilities,
     asks_for_charts,
     asks_for_plan_sync,
+    asks_to_create_week_plan,
     detect_intent,
     strip_log_prefix,
     wants_week_plan_write,
 )
 from coach_bot.intervals_client import IntervalsClient
-from coach_bot.intervals_planner import events_for_active_week, parse_single_workout_request
+from coach_bot.intervals_planner import (
+    _monday_of_week,
+    parse_single_workout_request,
+    parse_week_plan_table,
+)
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
     extract_week_plan_from_text,
@@ -76,9 +85,16 @@ class CoachOrchestrator:
         # ingen «tittelkort», og aldri en fornektelse av egne evner.
         return natural_reply(text)
 
-    def _attach_charts(self, reply: CoachReply, bundle: dict, as_of) -> CoachReply:
+    def _attach_charts(
+        self, reply: CoachReply, bundle: dict, as_of, user_message: str = ""
+    ) -> CoachReply:
         paths = []
-        p1 = render_ctl_atl_chart(bundle.get("wellness") or [])
+        theme = chart_theme_from_message(user_message)
+        p1 = render_ctl_atl_chart(
+            bundle.get("wellness") or [],
+            ctl_color=theme.get("ctl", "#2563eb"),
+            atl_color=theme.get("atl", "#dc2626"),
+        )
         p2 = render_discipline_week_chart(bundle.get("activities") or [], as_of)
         if p1:
             paths.append(p1)
@@ -122,8 +138,11 @@ class CoachOrchestrator:
         if wants_week_plan_write(text):
             sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
             if sync:
-                self._remember(user_id, text, sync.text)
-                return sync
+                if asks_to_create_week_plan(text) and "Ingen ukeplan" in sync.text:
+                    pass
+                else:
+                    self._remember(user_id, text, sync.text)
+                    return sync
 
         # Direkte enkeltøkt med eksplisitt idrett + varighet (f.eks.
         # «legg inn sykkel 60 min i morgen») må opprettes direkte – før
@@ -184,7 +203,7 @@ class CoachOrchestrator:
             from coach_bot.aggregates import build_training_snapshot
 
             snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
-            reply = self._attach_charts(reply, bundle, snap.as_of)
+            reply = self._attach_charts(reply, bundle, snap.as_of, user_message=text)
             if intent in (Intent.WEEK, Intent.CHART, Intent.ANALYSIS) and not reply.image_paths:
                 reply.text += "\n\nNeste: logg økter/wellness i Intervals, eller sjekk files:write på Slack-appen."
 
@@ -248,7 +267,7 @@ class CoachOrchestrator:
         if want_charts and self._intervals:
             bundle = self._intervals.fetch_coach_bundle()
             snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
-            reply = self._attach_charts(reply, bundle, snap.as_of)
+            reply = self._attach_charts(reply, bundle, snap.as_of, user_message=text)
 
         if tool_ctx.staged_events:
             events = tool_ctx.staged_events
@@ -297,7 +316,7 @@ class CoachOrchestrator:
                 from coach_bot.aggregates import build_training_snapshot
 
                 snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
-                reply = self._attach_charts(reply, bundle, snap.as_of)
+                reply = self._attach_charts(reply, bundle, snap.as_of, user_message=text)
             return reply
         return CoachReply(text="Ukjent briefing. Prøv `briefing: test`, `briefing: morgen` eller `briefing: uke`.")
 
@@ -491,10 +510,12 @@ class CoachOrchestrator:
             from coach_bot.aggregates import build_training_snapshot
 
             snap = build_training_snapshot(bundle["activities"], tz=self._context._tz)
-            reply = self._attach_charts(reply, bundle, snap.as_of)
+            reply = self._attach_charts(reply, bundle, snap.as_of, user_message=text)
             if not reply.image_paths:
                 reply.text += "\n\nNeste: logg data i Intervals eller sjekk files:write på Slack-appen."
-        sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
+        sync = None
+        if asks_for_plan_sync(text):
+            sync = self._handle_sync_week(text, user_id, Intent.SYNC_WEEK)
         if sync:
             reply.text += f"\n\n{sync.text}"
             extra_blocks = sync.blocks or []
@@ -515,11 +536,29 @@ class CoachOrchestrator:
             )
         week_ref = self._repo.active_training_week()
         logger.info("Week sync: active plan %s", week_ref.filename)
-        events = events_for_active_week(self._repo)
+        md = self._repo.read(week_ref.filename)
+        as_of = self._intervals.today() if self._intervals else None
+        from datetime import date
+
+        today = as_of or date.today()
+        events = parse_week_plan_table(md, _monday_of_week(today))
+        if md.startswith("(fil mangler"):
+            from coach_bot.config import get_settings
+
+            settings = get_settings()
+            return compact_system_message(
+                "Ingen ukeplan",
+                (
+                    f"Fant ikke `{week_ref.filename}` (REPO_ROOT={settings.repo_root}, "
+                    f"effektiv={settings.effective_repo_root}). På Fly: ikke importer `REPO_ROOT` "
+                    "fra `.env` – bruk `/app` fra fly.toml."
+                ),
+                "Neste: redeploy eller `synk kalender` etter fix.",
+            )
         if not events:
             return compact_system_message(
                 "Ingen ukeplan",
-                f"Fant ingen økter å synce fra {week_ref.filename}. Rebuild deploy hvis du nettopp oppdaterte ukeplan i git.",
+                f"Fant ingen økter å synce fra {week_ref.filename}. Sjekk tabellformat i markdown.",
                 "Neste: sjekk LOFOTEN-2027/ukeplan eller skriv en enkeltøkt.",
             )
         self._sessions.set_pending(user_id, "intervals_week", {"events": events})
@@ -535,21 +574,25 @@ class CoachOrchestrator:
         return reply
 
     def _handle_single_workout(self, text: str, user_id: str) -> CoachReply | None:
-        if not self._intervals:
+        if not self._intervals or not self._sessions:
             return None
         today = self._intervals.today()
         event = parse_single_workout_request(text, today)
         if not event:
             return None
-        try:
-            self._intervals.create_event(event)
-            d = (event.get("start_date_local") or "")[:10]
-            name = event.get("name") or "Økt"
-            reply = CoachReply(text=f"Lagt inn i Intervals: {d} – {name}")
-            self._remember(user_id, text, reply.text)
-            return reply
-        except Exception as e:
-            return CoachReply(text=f"Kunne ikke legge inn økt: {e}")
+        self._sessions.set_pending(user_id, "intervals_single", {"event": event})
+        d = (event.get("start_date_local") or "")[:10]
+        name = event.get("name") or "Økt"
+        reply = compact_system_message(
+            "Forhåndsvisning – enkeltøkt",
+            f"{d}: {name}",
+            "Neste: svar `ja` for å legge inn i Intervals.",
+        )
+        reply.blocks = (reply.blocks or []) + [{"type": "divider"}] + single_workout_preview_blocks(
+            event
+        )
+        self._remember(user_id, text, reply.text)
+        return reply
 
     def run_morning_briefing(self) -> str:
         prompt = (

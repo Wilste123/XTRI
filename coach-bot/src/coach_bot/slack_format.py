@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from coach_bot.event_duration import event_duration_minutes
+
 
 def _section(text: str) -> dict[str, Any]:
     return {"type": "section", "text": {"type": "mrkdwn", "text": text[:3000]}}
@@ -34,8 +36,8 @@ def week_preview_blocks(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for ev in events[:14]:
         d = (ev.get("start_date_local") or "")[:10]
         name = ev.get("name") or "Økt"
-        mins = ev.get("planned_duration")
-        dur = f" · {int(mins) // 60} min" if mins else ""
+        em = event_duration_minutes(ev)
+        dur = f" · {em} min" if em else ""
         lines.append(f"• {d}: {name}{dur}")
     body = "\n".join(lines) if lines else "_Ingen økter i forslaget._"
     return briefing_blocks(

@@ -254,11 +254,22 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
             "type": "function",
             "function": {
                 "name": "delete_workout",
-                "description": "Fjern planlagt(e) økt(er) på en dato. Stages, krever «ja».",
+                "description": (
+                    "Fjern planlagt(e) økt(er) på en dato. Bruk sport eller name_contains "
+                    "når William ber om én spesifikk økt (f.eks. bare sykkel). Stages, krever «ja»."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "date": {"type": "string", "description": "ISO YYYY-MM-DD"}
+                        "date": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                        "sport": {
+                            "type": "string",
+                            "description": "Valgfri: run/ride/swim/sykkel/løp …",
+                        },
+                        "name_contains": {
+                            "type": "string",
+                            "description": "Valgfri: delstreng i øktnavn (case-insensitive)",
+                        },
                     },
                     "required": ["date"],
                 },
@@ -385,14 +396,26 @@ def _planned_events_in_range(ctx: ToolContext, start: date, end: date) -> list[d
 
 
 def _event_duration_seconds(e: dict[str, Any]) -> int:
-    for k in ("planned_duration", "moving_time", "duration"):
-        v = e.get(k)
-        if v:
-            try:
-                return int(v)
-            except (TypeError, ValueError):
-                pass
-    return 0
+    from coach_bot.event_duration import event_duration_seconds
+
+    return event_duration_seconds(e)
+
+
+def _sport_matches_event(e: dict[str, Any], sport_hint: str) -> bool:
+    hint = sport_hint.lower().strip()
+    if not hint:
+        return True
+    ev_type = str(e.get("type") or "").lower()
+    name = str(e.get("name") or "").lower()
+    mapping = {
+        "run": ("run", "løp", "lop", "jogg"),
+        "ride": ("ride", "sykkel", "bike", "sykl"),
+        "swim": ("swim", "svøm", "svom"),
+    }
+    for api_type, words in mapping.items():
+        if hint in words or hint == api_type:
+            return ev_type == api_type or any(w in name for w in words)
+    return hint in ev_type or hint in name
 
 
 def _stage_ops(ctx: ToolContext, ops: list[dict[str, Any]], preview: str) -> None:
@@ -411,8 +434,28 @@ def _tool_adjust_load(args: dict[str, Any], ctx: ToolContext) -> str:
     start = _parse_iso(args.get("start_date")) or today
     end = _parse_iso(args.get("end_date")) or (start + timedelta(days=6))
     evs = _planned_events_in_range(ctx, start, end)
+    if not evs and ctx.repo is not None:
+        from coach_bot.intervals_planner import events_for_active_week, scale_events_duration
+
+        repo_events = events_for_active_week(ctx.repo, as_of=today)
+        scaled = scale_events_duration(repo_events, percent)
+        if scaled and ctx.sessions and ctx.user_id:
+            ctx.staged_events = scaled
+            ctx.sessions.set_pending(ctx.user_id, "intervals_week", {"events": scaled})
+            lines = "\n".join(
+                f"- {(e.get('start_date_local') or '')[:10]}: {e.get('name')}"
+                for e in scaled[:14]
+            )
+            retning = "lettere" if percent < 0 else "tyngre"
+            return (
+                f"Ingen plan i Intervals – justerte aktiv ukeplan fra repo "
+                f"({abs(percent):.0f}% {retning}, venter på «ja»):\n{lines}"
+            )
     if not evs:
-        return f"Fant ingen planlagte økter i {start}–{end} å justere."
+        return (
+            f"Fant ingen planlagte økter i {start}–{end} å justere. "
+            "Prøv `synk kalender` for å legge ukeplan fra repo inn i Intervals først."
+        )
     factor = 1 + percent / 100.0
     ops: list[dict[str, Any]] = []
     lines: list[str] = []
@@ -464,6 +507,17 @@ def _tool_delete_workout(args: dict[str, Any], ctx: ToolContext) -> str:
     if not d:
         return "Trenger gyldig dato (YYYY-MM-DD)."
     evs = _planned_events_in_range(ctx, d, d)
+    sport = str(args.get("sport") or "").strip()
+    name_contains = str(args.get("name_contains") or "").strip().lower()
+    if sport or name_contains:
+        filtered: list[dict[str, Any]] = []
+        for e in evs:
+            if sport and not _sport_matches_event(e, sport):
+                continue
+            if name_contains and name_contains not in str(e.get("name") or "").lower():
+                continue
+            filtered.append(e)
+        evs = filtered
     if not evs:
         return f"Fant ingen planlagt økt {d} å slette."
     ops: list[dict[str, Any]] = []

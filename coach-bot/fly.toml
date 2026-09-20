@@ -4,7 +4,7 @@ primary_region = "ams"
 
 [build]
   context = ".."
-  dockerfile = "coach-bot/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 3000

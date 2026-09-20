@@ -106,6 +106,9 @@ def main() -> None:
         if pulled:
             logger.info("GitHub sync pulled: %s", ", ".join(pulled))
     repo = RepoReader(settings)
+    from coach_bot.repo_health import check_week_plan
+
+    check_week_plan(repo, settings)
     week_ov = settings.coach_week_override.strip() or None
     context = ContextBuilder(intervals, repo, settings.tz, week_override=week_ov)
     llm = OpenAILlmClient(settings)
