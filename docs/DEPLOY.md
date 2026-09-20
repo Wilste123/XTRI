@@ -38,12 +38,15 @@ fly secrets set \
   ALLOWED_SLACK_USER_IDS=... \
   INTERVALS_ATHLETE_ID=... \
   INTERVALS_API_KEY=... \
-  OPENAI_API_KEY=...
+  OPENAI_API_KEY=... \
+  MORNING_BRIEFING_ENABLED=true
 fly deploy --config coach-bot/fly.toml
 ```
 
 - `fly.toml` setter `min_machines_running = 1` og health check på `/health`.
 - `REPO_ROOT=/app` er satt i `fly.toml` – matcher Dockerfile.
+- Dockerfile kopierer ikke `.env` – briefing-flagg må settes som secrets (som over).
+- `WEEKLY_BRIEFING_ENABLED` er fortsatt av (default); sett `true` som secret hvis søndags-ukebriefing ønskes.
 - Endre `app = "lofoten-coach"` i `fly.toml` til unikt app-navn ved første `fly launch`.
 
 ## Railway
