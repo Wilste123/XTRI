@@ -9,6 +9,18 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# GitHub-synk (Atlas): bruk PAT i .env, eller gh CLI på Mac etter `gh auth login`.
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+  _gh_tok="$(grep -E '^GITHUB_TOKEN=' .env 2>/dev/null | cut -d= -f2- | tr -d '\r' || true)"
+  if [[ -z "${_gh_tok}" ]] && command -v gh >/dev/null 2>&1; then
+    if _from_gh="$(gh auth token 2>/dev/null)" && [[ -n "${_from_gh}" ]]; then
+      export GITHUB_TOKEN="${_from_gh}"
+      echo "GitHub: GITHUB_TOKEN fra gh auth (Atlas-synk aktiv for denne kjøringen)."
+    fi
+  fi
+  unset _gh_tok _from_gh
+fi
+
 if [[ ! -d .venv ]]; then
   python3 -m venv .venv
 fi

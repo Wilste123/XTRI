@@ -1,5 +1,11 @@
 # Logg – beslutninger og notater
 
+### NOTAT – 2026-09-20 (env)
+
+**Notat:** `.env` strukturert med seksjoner; `ADMIN_BRIEFING_SECRET` generert. `GITHUB_TOKEN` fortsatt tom i fil – fyll PAT eller bruk `gh auth login` + `start.sh` (henter token ved oppstart). `TAVILY_API_KEY` valgfri.
+
+---
+
 ### NOTAT – 2026-09-20
 
 **Notat:** `coach-bot/ENV_TODO.md` er sjekklisten for miljøvariabler etter merge av PR #5–#13. Tracked `.env` fikk tomme felter for GitHub, Tavily, ukebriefing og admin-secret (defaults = feature av). Kjernetokens var allerede satt.

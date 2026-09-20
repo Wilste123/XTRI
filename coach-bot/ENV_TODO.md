@@ -1,7 +1,7 @@
 # .env-todoliste – få alle nye coach-features til å virke
 
 **Sist sjekket:** 2026-09-20  
-**GitHub `main`:** `c2438b7` — Merge PR #13 (Atlas + GitHub-synk). **Oppdatert.**  
+**GitHub `main`:** `33a3c85` — Merge PR #14 (ENV_TODO + utvidet `.env`). **Oppdatert.**  
 **Denne Macen / lokal clone:** kjør `git pull origin main` før du fyller nøkler. Snapshot-miljøer kan ligge titalls commits bak.
 
 Kjernedata (Slack, Intervals, OpenAI) ligger allerede i `coach-bot/.env`. Det som **mangler** er nøkler og Slack-scopes som ble lagt til etter PR #5–#13. Tomme felt i `.env` gir trygge defaults (feature av), ikke krasj.
@@ -58,9 +58,9 @@ Uten token lærer coachen lokalt til `11_ATLAS.md`, men **committer ikke** til G
 
 - [ ] GitHub → Settings → Developer settings → **Personal access token** (fine-grained mot `wilste123/xtri`, eller classic)
   - Scope: **Contents: Read and write** (Contents API)
-- [ ] Sett i `.env`:
+- [ ] Sett i `.env` **eller** `gh auth login` på Mac (da henter `./scripts/start.sh` token automatisk):
   ```
-  GITHUB_TOKEN=ghp_...   # eller github_pat_...
+  GITHUB_TOKEN=ghp_...   # eller github_pat_... (kan stå tom lokalt hvis gh er innlogget)
   GITHUB_REPO=Wilste123/XTRI
   GITHUB_BRANCH=main
   MEMORY_AUTO_LEARN=true
