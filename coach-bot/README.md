@@ -2,6 +2,10 @@
 
 Slack **DM**-coach: leser **intervals.icu** og **LOFOTEN-2027**, svarer via OpenAI.
 
+## Workout builder (Intervals)
+
+Coachen kan legge inn **strukturerte økter** (Intervals workout-tekst i `description`: `- 25m 65% HR`, `Main set 6x`, …) via verktøyene `build_workout` og `create_workouts` (`session_type` / `workout_text`). Terskler hentes fra Intervals (`get_athlete_thresholds`). Markdown-ukeplan er skeleton; detaljer genereres av botten.
+
 ## Bruk
 
 1. Sett opp [docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md) (Socket Mode).

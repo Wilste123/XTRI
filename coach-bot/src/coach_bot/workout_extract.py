@@ -7,7 +7,14 @@ import re
 from datetime import date, timedelta
 from typing import Any
 
-from coach_bot.intervals_planner import _SPORT_MAP, _detect_type
+from coach_bot.intervals_planner import (
+    _DAY_MAP,
+    _SPORT_MAP,
+    _detect_type,
+    _parse_duration_minutes,
+    coach_external_id,
+    estimate_planned_load,
+)
 
 _WRITE_ACTION = re.compile(
     r"(legg\s+den\s+inn|legge\s+den\s+inn|legg\s+inn|legge\s+inn|legg\s+til|"
@@ -69,6 +76,11 @@ def is_commit_only_message(message: str) -> bool:
     if not is_commit_message(message):
         return False
     lower = (message or "").lower().strip()
+    # «Legg den inn i Intervals» er write-oppfølging på forrige plan, ikke bare «ja».
+    if ("legg den" in lower or "legge den" in lower) and (
+        "interval" in lower or "intervall" in lower
+    ):
+        return False
     if len(lower) > 60:
         return False
     plan_words = (
@@ -148,6 +160,107 @@ def _parse_plan_date(fragment: str, as_of: date) -> date | None:
     return None
 
 
+def _week_start_from_plan_header(text: str, as_of: date) -> date | None:
+    m = re.search(
+        r"(\d{4}-\d{2}-\d{2})\s*[–\-—]\s*(\d{4}-\d{2}-\d{2})", text
+    )
+    if m:
+        try:
+            return date.fromisoformat(m.group(1))
+        except ValueError:
+            pass
+    m = re.search(r"ukeplan\s*\(?\s*(\d{4}-\d{2}-\d{2})", text, re.I)
+    if m:
+        try:
+            return date.fromisoformat(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _skip_rest_day(workout_cell: str, mins: int) -> bool:
+    low = workout_cell.lower()
+    if mins <= 0:
+        return True
+    if "fri" in low and not any(
+        k in low for k in ("løp", "lop", "sykkel", "sykl", "svøm", "svom", "styrke", "gåtur")
+    ):
+        return True
+    if low.strip() in ("—", "-", "fri", "hvile"):
+        return True
+    return False
+
+
+def extract_week_plan_from_markdown_table(
+    text: str, *, as_of: date, max_events: int = 14
+) -> list[dict[str, Any]]:
+    """Parse coach markdown table (| Man | Økt | Varighet |) into calendar events."""
+    if not text or "|" not in text:
+        return []
+    week_start = _week_start_from_plan_header(text, as_of)
+    if week_start is None:
+        return []
+    events: list[dict[str, Any]] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("|"):
+            continue
+        if "---" in line or re.search(r"\|\s*dag\s*\|", line, re.I):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        day_cell, workout_cell, duration_cell = cells[0], cells[1], cells[2]
+        intensity_cell = cells[3] if len(cells) > 3 else ""
+        day_key = day_cell.lower().strip()[:3]
+        if day_key not in _DAY_MAP:
+            continue
+        mins = _parse_duration_minutes(duration_cell) or _parse_duration_minutes(workout_cell)
+        if mins is None:
+            mins = 45
+        if _skip_rest_day(workout_cell, mins):
+            continue
+        event_date = week_start + timedelta(days=_DAY_MAP[day_key])
+        sport = _detect_type(workout_cell)
+        name = _workout_name_from_text(workout_cell, mins)
+        desc_parts = [workout_cell.strip()]
+        if intensity_cell:
+            desc_parts.append(f"Intensitet: {intensity_cell}")
+        load = estimate_planned_load(mins)
+        events.append(
+            {
+                "category": "WORKOUT",
+                "type": sport,
+                "start_date_local": f"{event_date.isoformat()}T00:00:00",
+                "name": name[:80],
+                "description": " · ".join(desc_parts)[:500],
+                "planned_duration": mins * 60,
+                "load": load,
+                "icu_training_load": load,
+                "external_id": coach_external_id(event_date, sport),
+            }
+        )
+        if len(events) >= max_events:
+            break
+    events.sort(key=lambda e: e["start_date_local"])
+    return events
+
+
+def extract_week_plan_from_assistant(
+    text: str, *, as_of: date, max_events: int = 14
+) -> list[dict[str, Any]]:
+    """Best effort: markdown uke-tabell først, deretter dag-for-dag-prosa."""
+    table_events = extract_week_plan_from_markdown_table(
+        text, as_of=as_of, max_events=max_events
+    )
+    if len(table_events) >= 2:
+        return table_events
+    prose = extract_week_plan_from_text(text, as_of=as_of, max_events=max_events)
+    if len(prose) >= len(table_events):
+        return prose
+    return table_events
+
+
 def extract_week_plan_from_text(
     text: str, *, as_of: date, max_events: int = 14
 ) -> list[dict[str, Any]]:
@@ -203,13 +316,44 @@ def extract_week_plan_from_text(
 def asks_workout_for_calendar(message: str) -> bool:
     """User wants coach to plan/create a calendar workout (often tomorrow)."""
     lower = (message or "").lower()
-    has_workout = any(w in lower for w in ("økt", "okt", "workout", "trening", "intervall"))
+    if ("legg den" in lower or "legge den" in lower) and (
+        "interval" in lower or "intervall" in lower
+    ):
+        return False
+    has_workout = any(w in lower for w in ("økt", "okt", "workout", "trening"))
+    if "intervall" in lower and "intervals" not in lower and "intervalls" not in lower:
+        has_workout = True
     has_action = any(
         w in lower for w in ("legg", "legge", "opprett", "kan du", "sette", "lage", "planlegg")
     )
     has_when = any(w in lower for w in ("i morgen", "imorgen", "tomorrow", "kalender"))
     has_intervals = "intervals" in lower or "intervalls" in lower
     return has_workout and has_action and (has_when or has_intervals)
+
+
+def _workout_focus_text(combined: str) -> str:
+    """Narrow text used for duration parsing (ignore uke-volum m.m.)."""
+    lower = combined.lower()
+    for marker in ("### anbefalt økt", "**type:**", "## plan for i morgen"):
+        idx = lower.find(marker)
+        if idx >= 0:
+            return combined[idx : idx + 2000]
+    lines: list[str] = []
+    for line in combined.splitlines():
+        low = line.lower()
+        if any(
+            x in low
+            for x in (
+                "volummålet",
+                "timer for uken",
+                "3–5 timer",
+                "3-5 timer",
+                "bratte volum",
+            )
+        ):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _parse_minutes(text: str) -> int:
@@ -290,10 +434,12 @@ def extract_workout_from_text(
     ):
         return None
 
-    mins = _parse_minutes(combined)
-    for line in combined.splitlines():
+    focus = _workout_focus_text(combined)
+    mins = _parse_minutes(focus)
+    for line in focus.splitlines():
         if "varighet" in line.lower() or "total" in line.lower():
             mins = max(mins, _parse_minutes(line))
+    mins = min(mins, 240)
 
     target = _parse_target_date(combined, as_of)
     name = _workout_name_from_text(combined, mins)

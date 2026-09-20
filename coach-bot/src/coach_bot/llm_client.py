@@ -40,11 +40,11 @@ _INTENT_HINTS = {
 
 _TOOL_GUIDE = (
     "Du har verktøy – bruk dem aktivt i stedet for bare å beskrive:\n"
-    "- create_workouts: når William vil ha økter i kalenderen (én eller en hel "
-    "uke). For «neste 7 dager»: send 5–7 workouts i ett kall med date, sport, "
-    "duration_min (15–180), description/structure, planned_load eller rpe. "
-    "Bruk get_week_plan for Base_0/baseline. Øktene opprettes FØRST når han "
-    "bekrefter med «ja» – du staged dem.\n"
+    "- build_workout / create_workouts: detaljerte Intervals-økter (syntax som "
+    "workout builder: «- 25m 65% HR», «Main set 6x», recovery-linjer). "
+    "Bruk session_type (threshold_ride, test_run_20, …) eller workout_text. "
+    "get_athlete_thresholds for FTP/LTHR. get_week_plan er skeleton/hensikt – "
+    "du er treneren som fyller struktur. Staging → «ja» for commit.\n"
     "- adjust_load: juster planlagt belastning i en periode med prosent (f.eks. "
     "«gjør uka 20% lettere» -> percent=-20).\n"
     "- move_workout / delete_workout: flytt eller fjern planlagte økter. Ved "

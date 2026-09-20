@@ -234,6 +234,31 @@ def test_week_sync_preview_then_confirm(orch):
     assert orch["intervals"].bulk  # nå er økter skrevet
 
 
+_BASE0_TABLE = """
+Ukeplan (2026-09-21 – 2026-09-27)
+| Dag | Økt | Varighet |
+| --- | --- | ---: |
+| Tir | 20 min jevn løp | 50 min |
+| Fre | steady sykkel | 70 min |
+| Lør | Sykkel og løp brick | 90 min |
+"""
+
+
+def test_week_table_in_chat_then_legg_den_inn(orch):
+    o = orch["orch"]
+    uid = "U_TABLE"
+    o._sessions.append(uid, "assistant", _BASE0_TABLE)
+    preview = o.run_chat("legg den inn i intervalls", user_id=uid)
+    assert "Lagt inn" in preview.text or "økter" in preview.text.lower()
+    if orch["intervals"].bulk:
+        assert len(orch["intervals"].bulk) >= 2
+    else:
+        assert preview.blocks
+        confirm = o.run_chat("ja", user_id=uid)
+        assert "Lagt inn" in confirm.text
+        assert len(orch["intervals"].bulk) >= 2
+
+
 def test_proposal_then_followup_commit(orch):
     o = orch["orch"]
     proposal = o.run_chat(
