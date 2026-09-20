@@ -2,21 +2,28 @@
 
 **`coach-bot/.env` ligger i git** – William sitt test-oppsett. Etter `git pull` skal filen være der; rediger og commit når du roterer nøkler.
 
+**Hva du må fylle for nye features:** [ENV_TODO.md](ENV_TODO.md)
+
 ```bash
 cd coach-bot
 ./scripts/start.sh
 ```
 
-| Variabel | Hvor finner du det |
-|----------|-------------------|
-| `SLACK_BOT_TOKEN` | Slack app → OAuth |
-| `SLACK_APP_TOKEN` | App-Level Token (`connections:write`) |
-| `SLACK_SIGNING_SECRET` | Basic Information |
-| `ALLOWED_SLACK_USER_IDS` | Slack member ID |
-| `REPO_ROOT` | `/Users/william/XTRI` |
-| `INTERVALS_*` | intervals.icu Settings |
-| `OPENAI_API_KEY` | platform.openai.com |
-| `GITHUB_TOKEN` / `GITHUB_REPO` | Valgfri på Fly: synk `LOFOTEN-2027` (Atlas, CURRENT_STATUS) til/fra GitHub |
-| `MEMORY_AUTO_LEARN` | `true` (default): lær varige fakta fra DM til `11_ATLAS.md` |
+| Variabel | Påkrevd? | Hvor |
+|----------|----------|------|
+| `SLACK_BOT_TOKEN` | ja | Slack app → OAuth (reinstall etter nye scopes) |
+| `SLACK_APP_TOKEN` | ja | App-Level Token (`connections:write`) |
+| `SLACK_SIGNING_SECRET` | ja | Basic Information |
+| `ALLOWED_SLACK_USER_IDS` | ja for briefing | Slack member ID |
+| `REPO_ROOT` | ja (lokal) | `/Users/william/XTRI` — på Fly: `/app` via `fly.toml` |
+| `INTERVALS_ATHLETE_ID` / `INTERVALS_API_KEY` | ja | intervals.icu Settings |
+| `OPENAI_API_KEY` / `COACH_MODEL` | ja | platform.openai.com |
+| `MORNING_BRIEFING_ENABLED` | ja for 07:00-DM | `true` på `main`; sett også som Fly secret |
+| `GITHUB_TOKEN` / `GITHUB_REPO` / `GITHUB_BRANCH` | ja på Fly | PAT med Contents R/W mot `Wilste123/XTRI` |
+| `MEMORY_AUTO_LEARN` | nei (default `true`) | lær varige fakta fra DM til `11_ATLAS.md` |
+| `TAVILY_API_KEY` | nei | [tavily.com](https://tavily.com) — live web-søk |
+| `ADMIN_BRIEFING_SECRET` | nei | låser `POST /admin/briefing` |
+| `WEEKLY_BRIEFING_ENABLED` | nei (default `false`) | søndags-ukestatus |
 
-Slack DM: [../docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md)
+Slack-scopes (`files:write` for grafer): [../docs/SLACK_SETUP.md](../docs/SLACK_SETUP.md)  
+Fly secrets: [../docs/DEPLOY.md](../docs/DEPLOY.md)

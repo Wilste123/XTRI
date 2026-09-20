@@ -42,14 +42,17 @@ fly secrets set \
   MORNING_BRIEFING_ENABLED=true \
   GITHUB_TOKEN=ghp_... \
   GITHUB_REPO=Wilste123/XTRI \
-  MEMORY_AUTO_LEARN=true
+  GITHUB_BRANCH=main \
+  MEMORY_AUTO_LEARN=true \
+  TAVILY_API_KEY=tvly-...
 fly deploy --config coach-bot/fly.toml
 ```
 
 - `fly.toml` setter `min_machines_running = 1` og health check på `/health`.
 - `REPO_ROOT=/app` er satt i `fly.toml` – matcher Dockerfile.
-- Dockerfile kopierer ikke `.env` – briefing-flagg må settes som secrets (som over).
+- Dockerfile kopierer ikke `.env` – briefing-flagg, GitHub og Tavily må settes som secrets (som over). Full sjekkliste: [../coach-bot/ENV_TODO.md](../coach-bot/ENV_TODO.md).
 - `WEEKLY_BRIEFING_ENABLED` er fortsatt av (default); sett `true` som secret hvis søndags-ukebriefing ønskes.
+- `TAVILY_API_KEY` er valgfri; uten den bruker coachen bare intern kunnskapsbase.
 - Endre `app = "lofoten-coach"` i `fly.toml` til unikt app-navn ved første `fly launch`.
 
 ## Railway
