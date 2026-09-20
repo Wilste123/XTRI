@@ -32,7 +32,7 @@ Se [06_TESTRESULTATER.md](06_TESTRESULTATER.md) – baseline ikke fullført enn�
 | | Status |
 |---|--------|
 | GitHub repo | https://github.com/Wilste123/XTRI |
-| **OP (Slack DM)** | Daglig: status, i morgen, ukestatus. `logg: …` for notater hit. |
+| **OP (Slack DM)** | Daglig: status, i morgen, ukestatus. `logg: …` for notater hit. Atlas (`11_ATLAS.md`) husker varige fakta om deg over tid. |
 | **Cursor** | Store planendringer, nye ukeplan-filer, research |
 | Intervals kalenderplan | Fyll denne + neste uke som events |
 

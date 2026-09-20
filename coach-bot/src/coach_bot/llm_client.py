@@ -52,6 +52,8 @@ _TOOL_GUIDE = (
     "kunnskapsbasen (nytt utstyr, race-oppdateringer, ny forskning).\n"
     "- render_charts: når han vil se en graf eller visuell fremstilling.\n"
     "- log_note: når han rapporterer smerte/søvn/form som bør noteres.\n"
+    "- remember_fact: lagre varig personlig fakta (ny sykkel, preferanse, skadehistorikk).\n"
+    "- search_personal_memory: sjekk Atlas før du antar noe om William.\n"
     "Alle kalender-endringer krever «ja» før de utføres. Aldri si at du «ikke "
     "kan» noe av dette – bruk verktøyet."
 )

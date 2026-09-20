@@ -20,6 +20,8 @@ from coach_bot.orchestrator import CoachOrchestrator
 from coach_bot.proactive import start_proactive_schedulers
 from coach_bot.repo_reader import RepoReader
 from coach_bot.repo_writer import RepoWriter
+from coach_bot.github_repo import GitHubRepoSync
+from coach_bot.memory_learn import MemoryLearner
 from coach_bot.session_store import SessionStore
 from coach_bot.slack_handlers import register_handlers
 
@@ -98,12 +100,18 @@ def main() -> None:
     db_path = bot_root / settings.session_db_path
 
     intervals = IntervalsClient(settings)
+    github = GitHubRepoSync(settings)
+    if github.enabled:
+        pulled = github.pull_sync_files()
+        if pulled:
+            logger.info("GitHub sync pulled: %s", ", ".join(pulled))
     repo = RepoReader(settings)
     week_ov = settings.coach_week_override.strip() or None
     context = ContextBuilder(intervals, repo, settings.tz, week_override=week_ov)
     llm = OpenAILlmClient(settings)
     sessions = SessionStore(db_path, settings.session_max_turns)
-    repo_writer = RepoWriter(settings)
+    repo_writer = RepoWriter(settings, github=github if github.enabled else None)
+    memory_learner = MemoryLearner(settings, github if github.enabled else None)
     orchestrator = CoachOrchestrator(
         context,
         llm,
@@ -111,6 +119,8 @@ def main() -> None:
         repo_writer,
         intervals=intervals,
         repo=repo,
+        memory_learner=memory_learner,
+        github=github if github.enabled else None,
         max_bulk_events=settings.intervals_max_bulk_events,
     )
 

@@ -2,6 +2,14 @@
 
 ### BESLUTNING – 2026-09-20
 
+**Beslutning:** Langsiktig personlig hukommelse i `11_ATLAS.md` (Atlas). Coach lagrer varige fakta via verktøy + auto-læring fra DM; git/GitHub forblir source of truth (ikke Supabase for profil).
+
+**Begrunnelse:** William skal oppleve at coachen blir smartere over tid (utstyr, preferanser, helse) uten duplikat database.
+
+---
+
+### BESLUTNING – 2026-09-20
+
 **Beslutning:** Proaktiv morgenbriefing aktivert (`MORNING_BRIEFING_ENABLED=true`, kl. 07:00 Europe/Oslo). Ukebriefing forblir av.
 
 **Begrunnelse:** OP/Slack DM skal gi daglig status uten manuell forespørsel; flagget stod på `false`, så APScheduler startet aldri.

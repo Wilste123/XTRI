@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from slack_sdk import WebClient
 
@@ -48,6 +49,8 @@ class CoachOrchestrator:
         repo_writer: RepoWriter | None = None,
         intervals: IntervalsClient | None = None,
         repo: RepoReader | None = None,
+        memory_learner: Any | None = None,
+        github: Any | None = None,
         max_bulk_events: int = 14,
     ) -> None:
         self._context = context
@@ -56,6 +59,8 @@ class CoachOrchestrator:
         self._repo_writer = repo_writer
         self._intervals = intervals
         self._repo = repo
+        self._memory_learner = memory_learner
+        self._github = github
         self._max_bulk_events = max_bulk_events
 
     def _history_messages(self, user_id: str) -> list[dict[str, str]]:
@@ -216,6 +221,7 @@ class CoachOrchestrator:
             sessions=self._sessions,
             user_id=user_id,
             tz=self._context._tz,
+            github=self._github,
         )
 
         def _executor(name: str, arguments) -> str:
@@ -263,6 +269,11 @@ class CoachOrchestrator:
         if self._sessions and user_id:
             self._sessions.append(user_id, "user", user_msg)
             self._sessions.append(user_id, "assistant", assistant_msg)
+        if self._memory_learner and user_msg and assistant_msg:
+            try:
+                self._memory_learner.learn_from_turn(user_msg, assistant_msg)
+            except Exception:
+                logger.exception("Atlas auto-learn failed")
 
     def _handle_briefing_command(self, text: str, user_id: str) -> CoachReply | None:
         lower = text.lower().strip()

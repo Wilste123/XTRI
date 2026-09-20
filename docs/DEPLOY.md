@@ -39,7 +39,10 @@ fly secrets set \
   INTERVALS_ATHLETE_ID=... \
   INTERVALS_API_KEY=... \
   OPENAI_API_KEY=... \
-  MORNING_BRIEFING_ENABLED=true
+  MORNING_BRIEFING_ENABLED=true \
+  GITHUB_TOKEN=ghp_... \
+  GITHUB_REPO=Wilste123/XTRI \
+  MEMORY_AUTO_LEARN=true
 fly deploy --config coach-bot/fly.toml
 ```
 
