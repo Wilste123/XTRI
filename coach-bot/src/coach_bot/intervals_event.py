@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from coach_bot.intervals_workout_syntax import (
-    estimate_workout_minutes,
+    expand_repeat_blocks,
     extract_workout_syntax,
     validate_workout_syntax,
 )
@@ -17,10 +17,10 @@ def finalize_workout_event(event: dict[str, Any]) -> dict[str, Any]:
     if ev.get("category") and str(ev.get("category")).upper() != "WORKOUT":
         return ev
 
+    explicit_load = event.get("planned_load") or event.get("icu_training_load") or event.get("load")
+
     raw_desc = str(ev.get("description") or "")
-    syntax = extract_workout_syntax(raw_desc)
-    if not syntax and raw_desc.strip().startswith("-"):
-        syntax = raw_desc.strip()
+    syntax = expand_repeat_blocks(extract_workout_syntax(raw_desc) or raw_desc.strip())
 
     if syntax:
         val = validate_workout_syntax(syntax)
@@ -30,17 +30,18 @@ def finalize_workout_event(event: dict[str, Any]) -> dict[str, Any]:
             if secs > 0:
                 ev["planned_duration"] = secs
                 ev["moving_time"] = secs
-            load = ev.get("icu_training_load") or ev.get("load")
-            if load is None and val.estimated_minutes:
-                from coach_bot.intervals_planner import estimate_planned_load
-
-                ev["icu_training_load"] = estimate_planned_load(
-                    val.estimated_minutes, 6.0 if "85" in syntax else 5.0
-                )
-                ev["load"] = ev["icu_training_load"]
-            elif load is not None:
-                ev["icu_training_load"] = int(load)
-                ev["load"] = int(load)
+            # TSS/load: la Intervals beregne ved compile med mindre eksplisitt oppgitt.
+            if explicit_load is not None:
+                try:
+                    load_i = int(explicit_load)
+                    ev["icu_training_load"] = load_i
+                    ev["load"] = load_i
+                except (TypeError, ValueError):
+                    ev.pop("icu_training_load", None)
+                    ev.pop("load", None)
+            else:
+                ev.pop("icu_training_load", None)
+                ev.pop("load", None)
 
     sport = str(ev.get("type") or "")
     if syntax and not ev.get("target"):

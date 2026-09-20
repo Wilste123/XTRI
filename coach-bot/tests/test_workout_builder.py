@@ -18,8 +18,9 @@ def test_validate_threshold_syntax():
     assert val.ok
     assert val.estimated_minutes >= 60
     assert "Warmup" in text
-    assert "6x" in text
-    assert "Main set" not in text
+    assert "Active" in text
+    assert text.count("- 8m 85%-90% HR") == 6
+    assert "6x" not in text
     assert b.planned_load > 0
 
 
@@ -54,5 +55,5 @@ def test_enrich_event_adds_syntax():
     }
     out = enrich_event_dict(ev, phase="Base_0")
     assert "Warmup" in out["description"]
-    assert out.get("icu_training_load", 0) > 0
+    assert out.get("moving_time", 0) > 0
     assert "Main set" in out["description"] or "65% HR" in out["description"]

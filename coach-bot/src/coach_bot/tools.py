@@ -454,12 +454,6 @@ def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) 
         rpe_f = float(rpe) if rpe is not None else None
     except (TypeError, ValueError):
         rpe_f = None
-    load = w.get("planned_load")
-    try:
-        load_i = int(load) if load is not None else estimate_planned_load(mins, rpe_f)
-    except (TypeError, ValueError):
-        load_i = estimate_planned_load(mins, rpe_f)
-
     event: dict[str, Any] = {
         "category": "WORKOUT",
         "type": sport,
@@ -467,15 +461,15 @@ def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) 
         "name": name[:80],
         "description": desc[:4000],
         "planned_duration": mins * 60,
-        "load": load_i,
-        "icu_training_load": load_i,
         "external_id": coach_external_id(d, sport),
     }
+    if w.get("planned_load") is not None:
+        try:
+            event["planned_load"] = int(w["planned_load"])
+        except (TypeError, ValueError):
+            pass
     if target:
         event["target"] = target
-    if built and session_type:
-        event["icu_training_load"] = built.planned_load
-        event["load"] = built.planned_load
     return finalize_workout_event(event)
 
 

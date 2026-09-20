@@ -5,7 +5,9 @@ from coach_bot.intervals_workout_syntax import api_workout_description, extract_
 _THRESHOLD = """Warmup
 - 25m 65% HR
 
-6x
+Active
+- 8m 85%-90% HR
+- 3m 65%-70% HR
 - 8m 85%-90% HR
 - 3m 65%-70% HR
 
@@ -31,7 +33,7 @@ def test_finalize_sets_load_and_moving_time():
     )
     assert ev["description"].startswith("Warmup")
     assert ev.get("moving_time", 0) > 0
-    assert ev.get("icu_training_load", 0) > 0
+    assert "icu_training_load" not in ev
     assert ev.get("target") == "HR"
     assert ev.get("workout_doc") == {}
 
@@ -39,5 +41,5 @@ def test_finalize_sets_load_and_moving_time():
 def test_extract_workout_syntax_keeps_sections():
     s = extract_workout_syntax(_THRESHOLD)
     assert "Warmup" in s
-    assert "6x" in s
+    assert "Active" in s
     assert "Cooldown" in s

@@ -130,6 +130,49 @@ def validate_workout_syntax(text: str, *, max_minutes: int = 240) -> SyntaxValid
     return SyntaxValidation(ok=ok, errors=errors, estimated_minutes=est, step_lines=step_lines)
 
 
+def expand_repeat_blocks(text: str) -> str:
+    """Intervals UI often needs explicit repeated steps, not «6x» shorthand."""
+    if not text:
+        return text
+    if not any(_REPEAT.match(ln.strip()) for ln in text.splitlines()):
+        return text
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.strip()
+        if not stripped:
+            i += 1
+            continue
+        rm = _REPEAT.match(stripped)
+        if rm:
+            reps = int(rm.group(1))
+            block: list[str] = []
+            i += 1
+            while i < len(lines):
+                s = lines[i].strip()
+                if not s:
+                    i += 1
+                    break
+                if _REPEAT.match(s) or _SECTION.match(s):
+                    break
+                if s.startswith("-"):
+                    block.append(s)
+                    i += 1
+                    continue
+                break
+            if block:
+                if not out or not (out[-1].lower().startswith("active")):
+                    out.append("Active")
+                for _ in range(reps):
+                    out.extend(block)
+            continue
+        out.append(stripped)
+        i += 1
+    return "\n".join(out)
+
+
 def extract_workout_syntax(description: str) -> str:
     """Keep only lines Intervals can compile (sections, repeats, steps)."""
     if not description:
@@ -186,5 +229,6 @@ def merge_event_description(syntax: str, coach_notes: str = "") -> str:
 
 
 def api_workout_description(syntax: str) -> str:
-    """Description field for Intervals API – syntax only, no coach prose."""
-    return extract_workout_syntax(syntax) or (syntax or "").strip()
+    """Description field for Intervals API – syntax only, repeats expanded."""
+    base = extract_workout_syntax(syntax) or (syntax or "").strip()
+    return expand_repeat_blocks(base)

@@ -64,16 +64,13 @@ def infer_session_type(workout_cell: str, sport_type: str) -> str | None:
 
 
 def _template_threshold_ride(reps: int = 6, work_min: int = 8, rec_min: int = 3) -> str:
-    # Intervals.icu: section headers + «6x» (not «Main set 6x») + steps with «- duration target»
-    return (
-        "Warmup\n"
-        f"- 25m 65% HR\n\n"
-        f"{reps}x\n"
-        f"- {work_min}m 85%-90% HR\n"
-        f"- {rec_min}m 65%-70% HR\n\n"
-        "Cooldown\n"
-        "- 15m 55% HR"
-    )
+    # Intervals: eksplisitte steg per rep (ikke «6x»-shorthand i UI)
+    lines = ["Warmup", f"- 25m 65% HR", "", "Active"]
+    for _ in range(reps):
+        lines.append(f"- {work_min}m 85%-90% HR")
+        lines.append(f"- {rec_min}m 65%-70% HR")
+    lines.extend(["", "Cooldown", "- 15m 55% HR"])
+    return "\n".join(lines)
 
 
 def _template_easy_ride(minutes: int = 45) -> str:
@@ -96,13 +93,12 @@ def _template_test_run_20() -> str:
 
 
 def _template_test_swim_100() -> str:
-    return (
-        "- 15m easy swim\n\n"
-        "Main set 8x\n"
-        "- 100m 85% Pace\n"
-        "- 20s rest\n\n"
-        "- 10m easy swim"
-    )
+    lines = ["Warmup", "- 15m easy swim", "", "Active"]
+    for _ in range(8):
+        lines.append("- 100m 85% Pace")
+        lines.append("- 20s rest")
+    lines.extend(["", "Cooldown", "- 10m easy swim"])
+    return "\n".join(lines)
 
 
 def _template_brick(ride_min: int = 75, run_min: int = 12) -> str:
@@ -258,8 +254,6 @@ def enrich_event_dict(
     out["name"] = built.name
     out["description"] = built.description
     out["planned_duration"] = built.duration_min * 60
-    out["load"] = built.planned_load
-    out["icu_training_load"] = built.planned_load
     if built.target:
         out["target"] = built.target
     return finalize_workout_event(out)
