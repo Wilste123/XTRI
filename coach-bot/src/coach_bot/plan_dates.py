@@ -37,3 +37,14 @@ def parse_plan_start_date(message: str, as_of: date) -> date | None:
         except ValueError:
             pass
     return None
+
+
+def calendar_week_range(as_of: date, period: str) -> tuple[date, date]:
+    """Return (monday, sunday) for this_week or next_week relative to as_of."""
+    p = (period or "").lower().replace(" ", "_")
+    this_mon = as_of - timedelta(days=as_of.weekday())
+    if p in ("this_week", "denne_uke", "denne_uken", "this"):
+        return this_mon, this_mon + timedelta(days=6)
+    # next_week (default for «neste uke»)
+    nxt_mon = this_mon + timedelta(days=7)
+    return nxt_mon, nxt_mon + timedelta(days=6)

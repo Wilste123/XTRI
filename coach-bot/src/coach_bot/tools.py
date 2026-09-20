@@ -324,13 +324,21 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
             "function": {
                 "name": "delete_workout",
                 "description": (
-                    "Fjern planlagt(e) økt(er) på en dato. Bruk sport eller name_contains "
-                    "når William ber om én spesifikk økt (f.eks. bare sykkel). Stages, krever «ja»."
+                    "Fjern planlagte WORKOUT-økter på én dag eller i et datointervall. "
+                    "For «slett alle neste uke»: period=next_week ELLER start_date+end_date "
+                    "(alle matchende økter i ÉTT kall). Valgfri sport/name_contains. Krever «ja»."
                 ),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "date": {"type": "string", "description": "ISO YYYY-MM-DD"},
+                        "date": {"type": "string", "description": "ISO én dag (YYYY-MM-DD)"},
+                        "start_date": {"type": "string", "description": "ISO fra-dato (uke/periode)"},
+                        "end_date": {"type": "string", "description": "ISO til-dato (uke/periode)"},
+                        "period": {
+                            "type": "string",
+                            "enum": ["next_week", "this_week"],
+                            "description": "next_week = kommende mandag–søndag",
+                        },
                         "sport": {
                             "type": "string",
                             "description": "Valgfri: run/ride/swim/sykkel/løp …",
@@ -340,7 +348,6 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                             "description": "Valgfri: delstreng i øktnavn (case-insensitive)",
                         },
                     },
-                    "required": ["date"],
                 },
             },
         },
@@ -622,10 +629,32 @@ def _sport_matches_event(e: dict[str, Any], sport_hint: str) -> bool:
 
 
 def _stage_ops(ctx: ToolContext, ops: list[dict[str, Any]], preview: str) -> None:
-    ctx.staged_ops = ops
+    combined = list(ops)
+    if ctx.sessions and ctx.user_id:
+        get_pending = getattr(ctx.sessions, "get_pending", None)
+        pending = get_pending(ctx.user_id) if callable(get_pending) else None
+        if pending and pending[0] == "intervals_ops":
+            combined = ((pending[1] or {}).get("ops") or []) + list(ops)
+    merged: list[dict[str, Any]] = []
+    seen_del: set[Any] = set()
+    seen_upsert: set[str] = set()
+    for op in combined:
+        if op.get("op") == "delete" and op.get("id") is not None:
+            if op["id"] in seen_del:
+                continue
+            seen_del.add(op["id"])
+            merged.append(op)
+        elif op.get("op") == "upsert" and op.get("event"):
+            key = str(op["event"].get("external_id") or op["event"].get("id") or "")
+            if key and key in seen_upsert:
+                continue
+            if key:
+                seen_upsert.add(key)
+            merged.append(op)
+    ctx.staged_ops = merged
     ctx.ops_preview = preview
     if ctx.sessions and ctx.user_id:
-        ctx.sessions.set_pending(ctx.user_id, "intervals_ops", {"ops": ops})
+        ctx.sessions.set_pending(ctx.user_id, "intervals_ops", {"ops": merged})
 
 
 def _tool_adjust_load(args: dict[str, Any], ctx: ToolContext) -> str:
@@ -705,11 +734,41 @@ def _tool_move_workout(args: dict[str, Any], ctx: ToolContext) -> str:
     return f"Klargjort flytting (venter på «ja»):\n{preview}"
 
 
+def _is_planned_workout_event(e: dict[str, Any]) -> bool:
+    cat = str(e.get("category") or "").upper()
+    if cat and cat not in ("WORKOUT", "PLAN"):
+        return False
+    if cat == "NOTE":
+        return False
+    return e.get("id") is not None
+
+
+def _resolve_delete_range(args: dict[str, Any], ctx: ToolContext) -> tuple[date, date] | None:
+    from coach_bot.plan_dates import calendar_week_range
+
+    period = str(args.get("period") or "").strip()
+    if period:
+        return calendar_week_range(ctx.today(), period)
+    start = _parse_iso(args.get("start_date"))
+    end = _parse_iso(args.get("end_date"))
+    if start and end:
+        return start, end if end >= start else (end, start)
+    single = _parse_iso(args.get("date"))
+    if single:
+        return single, single
+    return None
+
+
 def _tool_delete_workout(args: dict[str, Any], ctx: ToolContext) -> str:
-    d = _parse_iso(args.get("date"))
-    if not d:
-        return "Trenger gyldig dato (YYYY-MM-DD)."
-    evs = _planned_events_in_range(ctx, d, d)
+    span = _resolve_delete_range(args, ctx)
+    if not span:
+        return "Trenger date, start_date+end_date, eller period=next_week/this_week."
+    start, end = span
+    evs = [
+        e
+        for e in _planned_events_in_range(ctx, start, end)
+        if _is_planned_workout_event(e)
+    ]
     sport = str(args.get("sport") or "").strip()
     name_contains = str(args.get("name_contains") or "").strip().lower()
     if sport or name_contains:
@@ -722,20 +781,26 @@ def _tool_delete_workout(args: dict[str, Any], ctx: ToolContext) -> str:
             filtered.append(e)
         evs = filtered
     if not evs:
-        return f"Fant ingen planlagt økt {d} å slette."
+        return f"Fant ingen planlagte økter {start}–{end} å slette."
     ops: list[dict[str, Any]] = []
     lines: list[str] = []
     for e in evs:
         eid = e.get("id")
         if eid is None:
             continue
-        ops.append({"op": "delete", "id": eid, "label": f"{d}: {e.get('name')}"})
-        lines.append(f"- slett {d}: {e.get('name')}")
+        d = (_parse_iso((e.get("start_date_local") or e.get("start_date") or "")[:10]) or start)
+        label = f"{d}: {e.get('name')}"
+        ops.append({"op": "delete", "id": eid, "label": label})
+        lines.append(f"- slett {label}")
     if not ops:
         return "Fant ingen økt med id å slette."
     preview = "\n".join(lines)
     _stage_ops(ctx, ops, preview)
-    return f"Klargjort sletting (venter på «ja»):\n{preview}"
+    span_s = start.isoformat() if start == end else f"{start}–{end}"
+    return (
+        f"Klargjort sletting av {len(ops)} økt(er) ({span_s}) "
+        f"(IKKE slettet ennå – venter på «ja»):\n{preview}"
+    )
 
 
 def _tool_web_search(args: dict[str, Any], ctx: ToolContext) -> str:
