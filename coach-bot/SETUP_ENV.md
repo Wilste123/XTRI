@@ -15,7 +15,7 @@ cd coach-bot
 | `SLACK_APP_TOKEN` | ja | App-Level Token (`connections:write`) |
 | `SLACK_SIGNING_SECRET` | ja | Basic Information |
 | `ALLOWED_SLACK_USER_IDS` | ja for briefing | Slack member ID |
-| `REPO_ROOT` | ja (lokal) | `/Users/william/XTRI` — på Fly: `/app` via `fly.toml` |
+| `REPO_ROOT` | ja (lokal) | `/Users/william/XTRI` — på Fly: **ikke** som secret; bruk `/app` via `fly.toml` |
 | `INTERVALS_ATHLETE_ID` / `INTERVALS_API_KEY` | ja | intervals.icu Settings |
 | `OPENAI_API_KEY` / `COACH_MODEL` | ja | platform.openai.com |
 | `MORNING_BRIEFING_ENABLED` | ja for 07:00-DM | `true` på `main`; sett også som Fly secret |
