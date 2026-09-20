@@ -18,6 +18,9 @@ class _Sessions:
     def set_pending(self, user_id, action_type, payload):
         self.pending[user_id] = (action_type, payload)
 
+    def get_pending(self, user_id):
+        return self.pending.get(user_id)
+
 
 class _Intervals:
     def __init__(self, events):
@@ -26,7 +29,7 @@ class _Intervals:
         self.upserted = []
 
     def today(self):
-        return date(2026, 9, 19)
+        return date(2026, 9, 20)
 
     def get_events(self, oldest, newest):
         return self._events
@@ -73,6 +76,40 @@ def test_delete_workout_stages_delete():
     out = execute_tool("delete_workout", {"date": "2026-09-20"}, ctx)
     assert "sletting" in out.lower()
     assert ctx.staged_ops[0] == {"op": "delete", "id": 9, "label": "2026-09-20: Svøm"}
+
+
+def test_delete_workout_range_next_week():
+    events = [
+        {"id": 1, "category": "WORKOUT", "start_date_local": "2026-09-21T00:00:00", "name": "A"},
+        {"id": 2, "category": "WORKOUT", "start_date_local": "2026-09-23T00:00:00", "name": "B"},
+        {"id": 3, "category": "WORKOUT", "start_date_local": "2026-09-24T00:00:00", "name": "C"},
+        {"id": 9, "category": "NOTE", "start_date_local": "2026-09-22T00:00:00", "name": "Note"},
+    ]
+    ctx = _ctx(events)
+    out = execute_tool("delete_workout", {"period": "next_week"}, ctx)
+    assert "3 økt" in out or "3 økter" in out.lower() or len(ctx.staged_ops) == 3
+    assert len(ctx.staged_ops) == 3
+    assert {op["id"] for op in ctx.staged_ops} == {1, 2, 3}
+
+
+def test_delete_workout_start_end_range():
+    events = [
+        {"id": 1, "category": "WORKOUT", "start_date_local": "2026-09-20T00:00:00", "name": "A"},
+        {"id": 2, "category": "WORKOUT", "start_date_local": "2026-09-25T00:00:00", "name": "B"},
+    ]
+    ctx = _ctx(events)
+    execute_tool(
+        "delete_workout",
+        {"start_date": "2026-09-21", "end_date": "2026-09-24"},
+        ctx,
+    )
+    assert len(ctx.staged_ops) == 0
+    execute_tool(
+        "delete_workout",
+        {"start_date": "2026-09-20", "end_date": "2026-09-26"},
+        ctx,
+    )
+    assert len(ctx.staged_ops) == 2
 
 
 def test_delete_workout_filters_by_sport():
