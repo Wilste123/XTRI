@@ -11,6 +11,7 @@ Coach oppdaterer denne filen når William deler **varige fakta** (utstyr, prefer
 ## Helse og skadehistorikk
 
 ## Mål og grenser (personlige)
+- 2026-09-20: William har som mål å delta i Lofoten Half Extreme 2027.
 
 ## Hendelser og beslutninger
 
