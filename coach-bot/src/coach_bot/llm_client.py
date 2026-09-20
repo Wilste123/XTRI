@@ -41,7 +41,9 @@ _INTENT_HINTS = {
 _TOOL_GUIDE = (
     "Du har verktøy – bruk dem aktivt i stedet for bare å beskrive:\n"
     "- create_workouts: når William vil ha økter i kalenderen (én eller en hel "
-    "uke). Oppgi ekte ISO-datoer (YYYY-MM-DD). Øktene opprettes FØRST når han "
+    "uke). For «neste 7 dager»: send 5–7 workouts i ett kall med date, sport, "
+    "duration_min (15–180), description/structure, planned_load eller rpe. "
+    "Bruk get_week_plan for Base_0/baseline. Øktene opprettes FØRST når han "
     "bekrefter med «ja» – du staged dem.\n"
     "- adjust_load: juster planlagt belastning i en periode med prosent (f.eks. "
     "«gjør uka 20% lettere» -> percent=-20).\n"

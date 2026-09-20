@@ -28,15 +28,16 @@ from coach_bot.intent import (
 )
 from coach_bot.intervals_client import IntervalsClient
 from coach_bot.intervals_planner import (
-    _monday_of_week,
+    events_from_repo_plan,
     parse_single_workout_request,
-    parse_week_plan_table,
 )
+from coach_bot.plan_dates import parse_plan_start_date
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
     extract_week_plan_from_text,
     extract_workout_from_text,
     is_commit_message,
+    is_commit_only_message,
     wants_full_plan,
     wants_intervals_write,
 )
@@ -121,6 +122,18 @@ class CoachOrchestrator:
             self._remember(user_id, text, confirmed.text)
             return confirmed
 
+        if is_commit_only_message(text) and self._sessions and not self._sessions.get_pending(
+            user_id
+        ):
+            reply = CoachReply(
+                text=(
+                    "Ingen ventende plan i Intervals. "
+                    "Si `synk kalender` eller beskriv ukeplanen, deretter `ja`."
+                )
+            )
+            self._remember(user_id, text, reply.text)
+            return reply
+
         if asks_workout_for_calendar(text):
             reply = self._propose_workout_for_calendar(text, user_id)
             self._remember(user_id, text, reply.text)
@@ -174,7 +187,11 @@ class CoachOrchestrator:
         # Agentisk verktøy-løp: la modellen selv kalle verktøy (opprett økter,
         # slå opp fagkunnskap, lage grafer, notere). Fallback til ren chat hvis
         # LLM-klienten ikke støtter verktøy (f.eks. i eldre tester).
-        if callable(getattr(self._llm, "complete_agentic", None)) and self._intervals:
+        if (
+            callable(getattr(self._llm, "complete_agentic", None))
+            and self._intervals
+            and not is_commit_only_message(text)
+        ):
             reply = self._run_agentic(text, intent, user_id)
             self._remember(user_id, text, reply.text)
             return reply
@@ -320,6 +337,43 @@ class CoachOrchestrator:
             return reply
         return CoachReply(text="Ukjent briefing. Prøv `briefing: test`, `briefing: morgen` eller `briefing: uke`.")
 
+    def _purge_coach_events_for_plan(self, events: list[dict[str, Any]]) -> int:
+        """Remove prior coach-staged calendar events in the plan date range."""
+        if not self._intervals or not events:
+            return 0
+        from datetime import date as date_cls
+
+        dates: list[date_cls] = []
+        for ev in events:
+            raw = (ev.get("start_date_local") or "")[:10]
+            try:
+                dates.append(date_cls.fromisoformat(raw))
+            except ValueError:
+                continue
+        if not dates:
+            return 0
+        start, end = min(dates), max(dates)
+        removed = 0
+        try:
+            existing = self._intervals.get_events(start, end)
+        except Exception:
+            logger.exception("Could not list events for purge")
+            return 0
+        for ev in existing or []:
+            eid = str(ev.get("external_id") or "")
+            if not (eid.startswith("lofoten-coach-") or eid.startswith("lofoten-coach-tool-")):
+                continue
+            if ev.get("id") is None:
+                continue
+            try:
+                self._intervals.delete_event(ev["id"])
+                removed += 1
+            except Exception:
+                logger.exception("Failed to delete coach event %s", eid)
+        if removed:
+            logger.info("Purged %d prior coach events (%s – %s)", removed, start, end)
+        return removed
+
     def _try_confirm_pending(self, text: str, user_id: str) -> CoachReply | None:
         if not self._sessions:
             return None
@@ -361,10 +415,12 @@ class CoachOrchestrator:
             if len(events) > self._max_bulk_events:
                 return CoachReply(text=f"Maks {self._max_bulk_events} økter per sync – del opp uken.")
             try:
+                purged = self._purge_coach_events_for_plan(events)
                 created = self._intervals.bulk_upsert_events(events)
                 n = len(created) if created else len(events)
+                extra = f" (fjernet {purged} gamle coach-økter i perioden)" if purged else ""
                 return CoachReply(
-                    text=f"Lagt inn {n} økter i Intervals-kalenderen. Sjekk kalenderen i appen.",
+                    text=f"Lagt inn {n} økter i Intervals-kalenderen{extra}. Sjekk kalenderen i appen.",
                     blocks=week_preview_blocks(events),
                 )
             except Exception as e:
@@ -541,7 +597,10 @@ class CoachOrchestrator:
         from datetime import date
 
         today = as_of or date.today()
-        events = parse_week_plan_table(md, _monday_of_week(today))
+        start = parse_plan_start_date(text, today)
+        events = events_from_repo_plan(
+            self._repo, today, start_date=start, skip_past=True
+        )
         if md.startswith("(fil mangler"):
             from coach_bot.config import get_settings
 

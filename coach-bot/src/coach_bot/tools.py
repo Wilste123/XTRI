@@ -175,8 +175,9 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                 "name": "create_workouts",
                 "description": (
                     "Foreslå å legge én eller flere økter i Intervals-kalenderen. "
+                    "Ved hel uke: send 5–7 workouts i ÉTT kall (neste 7 dager). "
                     "Øktene stages og opprettes FØRST når William bekrefter med «ja». "
-                    "Oppgi konkrete datoer (YYYY-MM-DD)."
+                    "Oppgi konkrete datoer (YYYY-MM-DD), varighet 15–180 min, planned_load/TSS."
                 ),
                 "parameters": {
                     "type": "object",
@@ -203,6 +204,18 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                                     "duration_min": {"type": "integer"},
                                     "name": {"type": "string"},
                                     "description": {"type": "string"},
+                                    "structure": {
+                                        "type": "string",
+                                        "description": "Oppvarming/intervaller/nedjogg som tekst",
+                                    },
+                                    "planned_load": {
+                                        "type": "integer",
+                                        "description": "Planlagt TSS/load (valgfri)",
+                                    },
+                                    "rpe": {
+                                        "type": "number",
+                                        "description": "Mål-RPE 1–10 (valgfri)",
+                                    },
                                 },
                                 "required": ["date", "sport", "duration_min"],
                             },
@@ -299,6 +312,8 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
 
 
 def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
+    from coach_bot.intervals_planner import coach_external_id, estimate_planned_load
+
     raw_date = str(w.get("date") or "").strip()[:10]
     try:
         d = date.fromisoformat(raw_date)
@@ -309,9 +324,20 @@ def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
         mins = int(w.get("duration_min") or 45)
     except (TypeError, ValueError):
         mins = 45
-    mins = max(5, min(mins, 600))
+    mins = max(15, min(mins, 240))
     name = (w.get("name") or "").strip() or f"{sport} {mins} min"
-    desc = (w.get("description") or name).strip()[:500]
+    parts = [w.get("description") or "", w.get("structure") or ""]
+    desc = " · ".join(p.strip() for p in parts if p and str(p).strip())[:500] or name
+    rpe = w.get("rpe")
+    try:
+        rpe_f = float(rpe) if rpe is not None else None
+    except (TypeError, ValueError):
+        rpe_f = None
+    load = w.get("planned_load")
+    try:
+        load_i = int(load) if load is not None else estimate_planned_load(mins, rpe_f)
+    except (TypeError, ValueError):
+        load_i = estimate_planned_load(mins, rpe_f)
     return {
         "category": "WORKOUT",
         "type": sport,
@@ -319,7 +345,9 @@ def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
         "name": name[:80],
         "description": desc,
         "planned_duration": mins * 60,
-        "external_id": f"lofoten-coach-tool-{d.isoformat()}-{sport.lower()}",
+        "load": load_i,
+        "icu_training_load": load_i,
+        "external_id": coach_external_id(d, sport),
     }
 
 
@@ -329,9 +357,9 @@ def _tool_create_workouts(args: dict[str, Any], ctx: ToolContext) -> str:
     seen: set[str] = set()
     for w in workouts:
         ev = _event_from_tool_workout(w)
-        if ev and ev["start_date_local"] not in seen:
+        if ev and ev["external_id"] not in seen:
             events.append(ev)
-            seen.add(ev["start_date_local"])
+            seen.add(ev["external_id"])
     if not events:
         return "Ingen gyldige økter (mangler dato/idrett)."
     ctx.staged_events = events

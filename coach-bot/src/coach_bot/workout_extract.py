@@ -64,6 +64,27 @@ def is_commit_message(message: str) -> bool:
     return False
 
 
+def is_commit_only_message(message: str) -> bool:
+    """Bare bekreftelse (ja/ok) uten ny plan i samme melding."""
+    if not is_commit_message(message):
+        return False
+    lower = (message or "").lower().strip()
+    if len(lower) > 60:
+        return False
+    plan_words = (
+        "synk",
+        "ukeplan",
+        "legg inn",
+        "legge inn",
+        "lag en",
+        "lage en",
+        "neste 7",
+        "detalj",
+        "tss",
+    )
+    return not any(w in lower for w in plan_words)
+
+
 def wants_full_plan(message: str) -> bool:
     """User refers to the whole multi-day plan, not a single workout."""
     low = (message or "").lower()
