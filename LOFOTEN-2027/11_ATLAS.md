@@ -8,6 +8,7 @@ Coach oppdaterer denne filen når William deler **varige fakta** (utstyr, prefer
 - 2026-09-20: William har en bakgrunn innen sykling.
 - 2026-09-20: William sykler Canyon Aeroad og bruker Wahoo Kickr til innendørs.
 - 2026-09-20: William sykler Canyon Aeroad.
+- 2026-09-20: William bruker Wahoo Kickr til innendørs trening.
 
 ## Preferanser og vaner
 
