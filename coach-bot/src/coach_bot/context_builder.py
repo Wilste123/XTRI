@@ -178,6 +178,19 @@ class ContextBuilder:
         if intent == Intent.RACE:
             parts.append("### MASTERPLAN (utdrag)\n" + repo["masterplan_excerpt"] + "\n")
 
+        if intent in (
+            Intent.STATUS,
+            Intent.WEEK,
+            Intent.GENERAL,
+            Intent.TOMORROW,
+            Intent.SYNC_WEEK,
+        ):
+            try:
+                th = self._intervals.get_athlete_thresholds()
+                parts.append("\n" + th.format_block() + "\n")
+            except Exception:
+                parts.append("\n## Intervals terskler\n(kunne ikke hente profil – sjekk API)\n")
+
         if intent in (Intent.STATUS, Intent.WEEK, Intent.GENERAL):
             parts.append("### CURRENT_STATUS\n" + repo["current_status"] + "\n")
             parts.append("### Treningsprogram (utdrag)\n" + repo["program_excerpt"] + "\n")

@@ -103,8 +103,56 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
             "type": "function",
             "function": {
                 "name": "get_week_plan",
-                "description": "Hent den aktive ukeplanen fra prosjektrepoet.",
+                "description": "Hent den aktive ukeplanen fra prosjektrepoet (skeleton/hensikt – detaljer via build_workout).",
                 "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_athlete_thresholds",
+                "description": (
+                    "Hent Williams FTP/LTHR/terskler fra Intervals-profil. "
+                    "Bruk før watt/terskel-økter og når han spør «hva er FTP» / «hvor bør jeg ligge»."
+                ),
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "build_workout",
+                "description": (
+                    "Bygg Intervals workout-tekst (syntax som workout builder: - 25m 65% HR, 6x …). "
+                    "Bruk session_type (threshold_ride, easy_ride, test_run_20, …) – deretter create_workouts "
+                    "med workout_text eller la create_workouts bruke session_type direkte."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "session_type": {
+                            "type": "string",
+                            "enum": sorted(
+                                [
+                                    "threshold_ride",
+                                    "easy_ride",
+                                    "recovery_ride",
+                                    "test_run_20",
+                                    "test_swim_100",
+                                    "brick_ride_run",
+                                    "easy_run",
+                                    "easy_swim",
+                                    "strength",
+                                ]
+                            ),
+                        },
+                        "sport": {"type": "string"},
+                        "duration_min": {"type": "integer"},
+                        "reps": {"type": "integer", "description": "Antall drag (terskel sykkel)"},
+                        "skeleton_hint": {"type": "string"},
+                    },
+                    "required": ["session_type"],
+                },
             },
         },
         {
@@ -175,9 +223,9 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                 "name": "create_workouts",
                 "description": (
                     "Foreslå å legge én eller flere økter i Intervals-kalenderen. "
-                    "Ved hel uke: send 5–7 workouts i ÉTT kall (neste 7 dager). "
-                    "Øktene stages og opprettes FØRST når William bekrefter med «ja». "
-                    "Oppgi konkrete datoer (YYYY-MM-DD), varighet 15–180 min, planned_load/TSS."
+                    "Ved hel uke: send 5–7 workouts i ÉTT kall. "
+                    "Bruk session_type ELLER workout_text (Intervals syntax: - 25m 65% HR, Main set 6x …). "
+                    "Øktene stages og opprettes FØRST når William bekrefter med «ja»."
                 ),
                 "parameters": {
                     "type": "object",
@@ -204,9 +252,17 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                                     "duration_min": {"type": "integer"},
                                     "name": {"type": "string"},
                                     "description": {"type": "string"},
+                                    "session_type": {
+                                        "type": "string",
+                                        "description": "Mal: threshold_ride, easy_ride, test_run_20, …",
+                                    },
+                                    "workout_text": {
+                                        "type": "string",
+                                        "description": "Intervals workout builder syntax (prioriter over structure)",
+                                    },
                                     "structure": {
                                         "type": "string",
-                                        "description": "Oppvarming/intervaller/nedjogg som tekst",
+                                        "description": "Fri coach-note (legges etter syntax)",
                                     },
                                     "planned_load": {
                                         "type": "integer",
@@ -311,23 +367,86 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
     return schemas
 
 
-def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
+def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) -> dict[str, Any] | None:
     from coach_bot.intervals_planner import coach_external_id, estimate_planned_load
+    from coach_bot.intervals_workout_syntax import (
+        merge_event_description,
+        validate_workout_syntax,
+    )
+    from coach_bot.workout_builder import build_workout
 
     raw_date = str(w.get("date") or "").strip()[:10]
     try:
         d = date.fromisoformat(raw_date)
     except ValueError:
         return None
-    sport = _SPORT_TO_TYPE.get(str(w.get("sport") or "").lower(), "Workout")
+    sport_key = str(w.get("sport") or "bike").lower()
+    sport = _SPORT_TO_TYPE.get(sport_key, "Workout")
+
+    thresholds = None
+    phase = "Base_0"
+    if ctx and ctx.intervals:
+        try:
+            thresholds = ctx.intervals.get_athlete_thresholds()
+        except Exception:
+            pass
+    if ctx and ctx.repo:
+        try:
+            phase = ctx.repo.detect_phase()
+        except Exception:
+            pass
+
+    workout_text = (w.get("workout_text") or "").strip()
+    session_type = (w.get("session_type") or "").strip().lower()
+    target = None
+    name = (w.get("name") or "").strip()
+
+    if session_type and not workout_text:
+        try:
+            reps = int(w["reps"]) if w.get("reps") is not None else None
+        except (TypeError, ValueError):
+            reps = None
+        try:
+            dur_in = int(w.get("duration_min") or 0) or None
+        except (TypeError, ValueError):
+            dur_in = None
+        built = build_workout(
+            session_type,
+            sport=sport_key,
+            duration_min=dur_in,
+            thresholds=thresholds,
+            phase=phase,
+            skeleton_hint=str(w.get("description") or w.get("structure") or ""),
+            reps=reps,
+        )
+        if built:
+            workout_text = built.workout_text
+            name = name or built.name
+            sport = built.sport_type
+            target = built.target
+
     try:
         mins = int(w.get("duration_min") or 45)
     except (TypeError, ValueError):
         mins = 45
-    mins = max(15, min(mins, 240))
-    name = (w.get("name") or "").strip() or f"{sport} {mins} min"
-    parts = [w.get("description") or "", w.get("structure") or ""]
-    desc = " · ".join(p.strip() for p in parts if p and str(p).strip())[:500] or name
+
+    coach_notes = " · ".join(
+        p.strip()
+        for p in (w.get("structure") or "", w.get("description") or "")
+        if p and str(p).strip() and not str(p).strip().startswith("-")
+    )
+    if workout_text:
+        val = validate_workout_syntax(workout_text)
+        if not val.ok:
+            return None
+        mins = val.estimated_minutes or mins
+        desc = merge_event_description(workout_text, coach_notes)
+    else:
+        mins = max(15, min(mins, 240))
+        parts = [w.get("description") or "", w.get("structure") or ""]
+        desc = " · ".join(p.strip() for p in parts if p and str(p).strip())[:500] or name
+
+    name = name or f"{sport} {mins} min"
     rpe = w.get("rpe")
     try:
         rpe_f = float(rpe) if rpe is not None else None
@@ -338,17 +457,21 @@ def _event_from_tool_workout(w: dict[str, Any]) -> dict[str, Any] | None:
         load_i = int(load) if load is not None else estimate_planned_load(mins, rpe_f)
     except (TypeError, ValueError):
         load_i = estimate_planned_load(mins, rpe_f)
-    return {
+
+    event: dict[str, Any] = {
         "category": "WORKOUT",
         "type": sport,
         "start_date_local": f"{d.isoformat()}T00:00:00",
         "name": name[:80],
-        "description": desc,
+        "description": desc[:4000],
         "planned_duration": mins * 60,
         "load": load_i,
         "icu_training_load": load_i,
         "external_id": coach_external_id(d, sport),
     }
+    if target:
+        event["target"] = target
+    return event
 
 
 def _tool_create_workouts(args: dict[str, Any], ctx: ToolContext) -> str:
@@ -356,7 +479,7 @@ def _tool_create_workouts(args: dict[str, Any], ctx: ToolContext) -> str:
     events: list[dict[str, Any]] = []
     seen: set[str] = set()
     for w in workouts:
-        ev = _event_from_tool_workout(w)
+        ev = _event_from_tool_workout(w, ctx)
         if ev and ev["external_id"] not in seen:
             events.append(ev)
             seen.add(ev["external_id"])
@@ -394,6 +517,59 @@ def _tool_get_week_plan(args: dict[str, Any], ctx: ToolContext) -> str:
     if ctx.repo is None:
         return "(ingen ukeplan tilgjengelig)"
     return ctx.repo.week_plan_excerpt()
+
+
+def _tool_get_athlete_thresholds(args: dict[str, Any], ctx: ToolContext) -> str:
+    if ctx.intervals is None:
+        return "(Intervals ikke tilgjengelig)"
+    try:
+        return ctx.intervals.get_athlete_thresholds().format_block()
+    except Exception as e:
+        return f"Kunne ikke hente terskler: {e}"
+
+
+def _tool_build_workout(args: dict[str, Any], ctx: ToolContext) -> str:
+    from coach_bot.workout_builder import build_workout
+
+    st = args.get("session_type") or ""
+    thresholds = None
+    phase = "Base_0"
+    if ctx.intervals:
+        try:
+            thresholds = ctx.intervals.get_athlete_thresholds()
+        except Exception:
+            pass
+    if ctx.repo:
+        try:
+            phase = ctx.repo.detect_phase()
+        except Exception:
+            pass
+    try:
+        reps = int(args["reps"]) if args.get("reps") is not None else None
+    except (TypeError, ValueError):
+        reps = None
+    try:
+        dur = int(args["duration_min"]) if args.get("duration_min") is not None else None
+    except (TypeError, ValueError):
+        dur = None
+    built = build_workout(
+        st,
+        sport=str(args.get("sport") or "bike"),
+        duration_min=dur,
+        thresholds=thresholds,
+        phase=phase,
+        skeleton_hint=str(args.get("skeleton_hint") or ""),
+        reps=reps,
+    )
+    if not built:
+        return f"Ugyldig session_type eller mal: {st}"
+    return (
+        f"Navn: {built.name}\n"
+        f"Type: {built.sport_type}\n"
+        f"Estimert: {built.duration_min} min, load ~{built.planned_load}\n\n"
+        f"{built.description}\n\n"
+        "Bruk workout_text i create_workouts, eller send session_type + date direkte."
+    )
 
 
 def _tool_render_charts(args: dict[str, Any], ctx: ToolContext) -> str:
@@ -603,6 +779,8 @@ _HANDLERS: dict[str, Callable[[dict[str, Any], ToolContext], str]] = {
     "search_personal_memory": _tool_search_personal_memory,
     "get_training_summary": _tool_get_training_summary,
     "get_week_plan": _tool_get_week_plan,
+    "get_athlete_thresholds": _tool_get_athlete_thresholds,
+    "build_workout": _tool_build_workout,
     "render_charts": _tool_render_charts,
     "log_note": _tool_log_note,
     "create_workouts": _tool_create_workouts,

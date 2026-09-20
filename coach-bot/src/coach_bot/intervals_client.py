@@ -25,6 +25,8 @@ class IntervalsClient:
         self._cache_key: tuple[int, date] | None = None
         self._cache_at: float = 0.0
         self._cache_bundle: dict[str, Any] | None = None
+        self._cache_athlete: dict[str, Any] | None = None
+        self._cache_athlete_at: float = 0.0
         self._client = httpx.Client(
             base_url=self._base,
             auth=("API_KEY", settings.intervals_api_key),
@@ -140,6 +142,28 @@ class IntervalsClient:
         self._cache_bundle = None
         self._cache_key = None
         self._cache_at = 0.0
+        self._cache_athlete = None
+        self._cache_athlete_at = 0.0
+
+    def get_athlete(self) -> dict[str, Any]:
+        """Fetch athlete profile (FTP, LTHR, etc.)."""
+        now = time.monotonic()
+        if self._cache_athlete is not None and (now - self._cache_athlete_at) < self._cache_ttl:
+            return self._cache_athlete
+        r = self._client.get(f"/athlete/{self._athlete_id}")
+        r.raise_for_status()
+        data = r.json()
+        if isinstance(data, dict):
+            self._cache_athlete = data
+        else:
+            self._cache_athlete = {"data": data}
+        self._cache_athlete_at = now
+        return self._cache_athlete
+
+    def get_athlete_thresholds(self):
+        from coach_bot.athlete_thresholds import parse_athlete_payload
+
+        return parse_athlete_payload(self.get_athlete())
 
     def bulk_upsert_events(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not events:

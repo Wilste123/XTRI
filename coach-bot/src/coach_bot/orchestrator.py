@@ -32,6 +32,7 @@ from coach_bot.intervals_planner import (
     parse_single_workout_request,
 )
 from coach_bot.plan_dates import parse_plan_start_date
+from coach_bot.workout_builder import enrich_events_list
 from coach_bot.workout_extract import (
     asks_workout_for_calendar,
     extract_week_plan_from_assistant,
@@ -480,6 +481,9 @@ class CoachOrchestrator:
             wants_full_plan(text) and len(week_events) >= 1
         ):
             if len(week_events) >= 2:
+                week_events = enrich_events_list(
+                    week_events, intervals=self._intervals, repo=self._repo
+                )
                 self._sessions.set_pending(
                     user_id, "intervals_week", {"events": week_events}
                 )
@@ -622,6 +626,7 @@ class CoachOrchestrator:
                 f"Fant ingen økter å synce fra {week_ref.filename}. Sjekk tabellformat i markdown.",
                 "Neste: sjekk LOFOTEN-2027/ukeplan eller skriv en enkeltøkt.",
             )
+        events = enrich_events_list(events, intervals=self._intervals, repo=self._repo)
         self._sessions.set_pending(user_id, "intervals_week", {"events": events})
         preview = "\n".join(
             f"- {(e.get('start_date_local') or '')[:10]}: {e.get('name')}" for e in events[:14]

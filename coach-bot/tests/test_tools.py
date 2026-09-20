@@ -68,6 +68,42 @@ def test_create_workouts_rejects_bad_dates():
     assert not ctx.staged_events
 
 
+def test_create_workouts_session_type_threshold():
+    ctx = _ctx()
+    args = {
+        "workouts": [
+            {
+                "date": "2026-09-22",
+                "sport": "bike",
+                "duration_min": 90,
+                "session_type": "threshold_ride",
+            }
+        ]
+    }
+    execute_tool("create_workouts", args, ctx)
+    ev = ctx.staged_events[0]
+    assert "Main set" in ev["description"]
+    assert ev["type"] == "Ride"
+    assert ev.get("target") == "HR"
+
+
+def test_build_workout_tool():
+    from coach_bot.athlete_thresholds import AthleteThresholds, SportThresholds
+
+    ctx = _ctx()
+
+    class _ThIntervals(_Intervals):
+        def get_athlete_thresholds(self):
+            return AthleteThresholds(ride=SportThresholds(ftp=260, lthr=168))
+
+    ctx.intervals = _ThIntervals()
+    out = execute_tool(
+        "build_workout", {"session_type": "threshold_ride", "sport": "bike"}, ctx
+    )
+    assert "Main set" in out
+    assert "260" in out
+
+
 def test_create_workouts_caps_duration():
     ctx = _ctx()
     args = {"workouts": [{"date": "2026-09-20", "sport": "bike", "duration_min": 300}]}
