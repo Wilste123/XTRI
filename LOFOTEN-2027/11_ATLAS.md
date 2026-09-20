@@ -19,5 +19,6 @@ Coach oppdaterer denne filen når William deler **varige fakta** (utstyr, prefer
 - 2026-09-20: William har som mål å delta i Lofoten Half Extreme 2027.
 
 ## Hendelser og beslutninger
+- 2026-09-20: William planlegger å delta i Lofoten Triathlon Half Extreme 2027 den 20. august.
 
 ## Frie notater
