@@ -1,6 +1,7 @@
 import json
 from datetime import date
 
+from coach_bot import atlas
 from coach_bot.tools import ToolContext, execute_tool
 
 
@@ -65,6 +66,47 @@ def test_create_workouts_rejects_bad_dates():
     out = execute_tool("create_workouts", args, ctx)
     assert "ingen gyldige" in out.lower()
     assert not ctx.staged_events
+
+
+def test_remember_fact_tool(tmp_path):
+    from coach_bot.repo_reader import RepoReader
+    from coach_bot.config import Settings
+
+    lof = tmp_path / "LOFOTEN-2027"
+    lof.mkdir()
+    (lof / "CURRENT_STATUS.md").write_text("# Status\n", encoding="utf-8")
+
+    class FakeSettings:
+        repo_root = tmp_path
+        lofoten_dir = lof
+        coach_week_override = ""
+
+    repo = RepoReader(FakeSettings())  # type: ignore[arg-type]
+    ctx = ToolContext(repo=repo)
+    out = execute_tool(
+        "remember_fact",
+        {"category": "utstyr", "fact": "Kjøpte Wahoo Elemnt ROAM"},
+        ctx,
+    )
+    assert "Lagret" in out
+    assert "Wahoo" in atlas.read_atlas(lof)
+
+
+def test_search_personal_memory_tool(tmp_path):
+    from coach_bot.repo_reader import RepoReader
+
+    lof = tmp_path / "LOFOTEN-2027"
+    lof.mkdir()
+    atlas.append_fact(lof, "helse", "Dårlig høyre kne i nedoverbakke")
+
+    class FakeSettings:
+        repo_root = tmp_path
+        lofoten_dir = lof
+        coach_week_override = ""
+
+    repo = RepoReader(FakeSettings())  # type: ignore[arg-type]
+    out = execute_tool("search_personal_memory", {"query": "kne"}, ToolContext(repo=repo))
+    assert "kne" in out.lower()
 
 
 def test_search_knowledge_tool():

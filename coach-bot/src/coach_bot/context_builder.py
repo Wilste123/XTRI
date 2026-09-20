@@ -14,6 +14,7 @@ from coach_bot.aggregates import (
 from coach_bot.coach_insights import build_coach_brief
 from coach_bot.intent import Intent
 from coach_bot.intervals_client import IntervalsClient
+from coach_bot import atlas
 from coach_bot.repo_reader import RepoReader
 
 
@@ -138,11 +139,20 @@ class ContextBuilder:
         )
         week_plan = self._repo.week_plan_excerpt(as_of_date=today)
 
+        atlas_block = atlas.excerpt_for_context(
+            self._repo._root,
+            user_message,
+            max_chars=2500,
+        )
+
         parts = [
             "# Coach-kontekst (DM)",
             f"Intent: {intent.value}",
             "",
             brief,
+            "",
+            "### PERSONLIG ATLAS (relevant hukommelse om William)",
+            atlas_block,
             "",
         ]
 

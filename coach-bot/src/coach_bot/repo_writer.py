@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import TYPE_CHECKING
 
 from coach_bot.config import Settings
 
+if TYPE_CHECKING:
+    from coach_bot.github_repo import GitHubRepoSync
+
 
 class RepoWriter:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, github: GitHubRepoSync | None = None) -> None:
         self._status_path = settings.lofoten_dir / "CURRENT_STATUS.md"
+        self._github = github
 
     def append_status_note(self, note: str, on_date: date | None = None) -> None:
         if not self._status_path.is_file():
@@ -30,3 +35,8 @@ class RepoWriter:
                 rest = rest.rstrip() + "\n" + line
             text = parts[0] + marker + rest
         self._status_path.write_text(text, encoding="utf-8")
+        if self._github and self._github.enabled:
+            self._github.publish_local(
+                self._status_path,
+                f"coach: status notat – {note.strip()[:72]}",
+            )

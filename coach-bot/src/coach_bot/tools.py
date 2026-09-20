@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any, Callable
 
-from coach_bot import knowledge, web_search
+from coach_bot import atlas, knowledge, web_search
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ class ToolContext:
     repo: Any = None
     context: Any = None
     repo_writer: Any = None
+    github: Any = None
     sessions: Any = None
     user_id: str = ""
     tz: str = "Europe/Oslo"
@@ -115,6 +116,45 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
                     "Bruk når William ber om visuell fremstilling/graf/figur."
                 ),
                 "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "remember_fact",
+                "description": (
+                    "Lagre VARIG personlig fakta om William i Atlas (utstyr, preferanser, "
+                    "helse, mål, hendelser). Bruk når han sier noe du skal huske senere "
+                    "(f.eks. ny sykkel, skade, jobbreise, allergi). Ikke for dagens økt."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "category": {
+                            "type": "string",
+                            "description": "utstyr|preferanser|helse|mål|hendelse|notat",
+                        },
+                        "fact": {"type": "string", "description": "Kort presis setning."},
+                    },
+                    "required": ["category", "fact"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "search_personal_memory",
+                "description": (
+                    "Søk i Atlas etter det coach allerede vet om William (utstyr, vaner, "
+                    "historikk). Bruk før du antar noe om ham."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Hva du vil huske/sjekke."}
+                    },
+                    "required": ["query"],
+                },
             },
         },
         {
@@ -445,6 +485,23 @@ def _tool_web_search(args: dict[str, Any], ctx: ToolContext) -> str:
     return web_search.search_web(args.get("query") or "")
 
 
+def _tool_remember_fact(args: dict[str, Any], ctx: ToolContext) -> str:
+    if ctx.repo is None:
+        return "Kan ikke lagre – repo mangler."
+    return atlas.persist_fact(
+        ctx.repo._root,
+        args.get("category") or "notat",
+        args.get("fact") or "",
+        github=ctx.github,
+    )
+
+
+def _tool_search_personal_memory(args: dict[str, Any], ctx: ToolContext) -> str:
+    if ctx.repo is None:
+        return "(repo mangler)"
+    return atlas.search_text(args.get("query") or "", ctx.repo._root, top_k=5)
+
+
 def _tool_log_note(args: dict[str, Any], ctx: ToolContext) -> str:
     note = (args.get("note") or "").strip()
     if not note:
@@ -460,6 +517,8 @@ def _tool_log_note(args: dict[str, Any], ctx: ToolContext) -> str:
 
 _HANDLERS: dict[str, Callable[[dict[str, Any], ToolContext], str]] = {
     "search_knowledge": _tool_search_knowledge,
+    "remember_fact": _tool_remember_fact,
+    "search_personal_memory": _tool_search_personal_memory,
     "get_training_summary": _tool_get_training_summary,
     "get_week_plan": _tool_get_week_plan,
     "render_charts": _tool_render_charts,

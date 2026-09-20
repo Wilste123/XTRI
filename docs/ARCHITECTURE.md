@@ -6,6 +6,7 @@
 |--------|-----------------|
 | intervals.icu | Økter, wellness (CTL/ATL), belastning, kalenderplan (events) |
 | LOFOTEN-2027/ | Mål, masterplan, CURRENT_STATUS, ukeplan, beslutninger |
+| LOFOTEN-2027/11_ATLAS.md | **Langsiktig personlig hukommelse** (utstyr, preferanser, helse, hendelser) |
 | Slack DM | Brukergrensesnitt |
 | coach-bot/data/sessions.db | Kort samtaleminne (lokal/sky) |
 
@@ -38,7 +39,9 @@ Transport: **Slack Socket Mode**. Health HTTP på port 3000.
 | `aggregates` | Volum, plan_vs_actual, wellness trends |
 | `coach_insights` | **COACH_BRIEF** (deterministisk analyse) |
 | `intent` | Klassifiser DM (status, uke, i morgen, logg, …) |
-| `RepoReader` / `RepoWriter` | Les plan; `logg:` → CURRENT_STATUS |
+| `RepoReader` / `RepoWriter` | Les plan; `logg:` → CURRENT_STATUS (+ GitHub commit i sky) |
+| `atlas` / `memory_learn` | Atlas R/W, auto-læring etter DM; verktøy `remember_fact` |
+| `github_repo` | Valgfri GitHub sync (pull ved oppstart, commit ved skriv) |
 | `ContextBuilder` | Intent-trimmet kontekst + COACH_BRIEF |
 | `SessionStore` | SQLite, siste N turner |
 | `CoachOrchestrator` | run_chat, morgen/uke-briefing |
@@ -62,11 +65,12 @@ Se [DEPLOY.md](DEPLOY.md) – Docker/Fly med `LOFOTEN-2027` baked in.
 - Intervals write: uke-preview + `ja`, enkeltøkt auto (`intervals_planner` + bulk upsert)
 - `POST /admin/briefing` med `X-Admin-Secret`
 
-## Persistens (SQLite vs Supabase)
+## Persistens (SQLite vs Supabase vs Atlas)
 
-- **Nå:** [`session_store.py`](../coach-bot/src/coach_bot/session_store.py) (SQLite) – samtale + `pending_actions` for Intervals-bekreftelse.
+- **Atlas (`11_ATLAS.md`):** Varige fakta om William – source of truth i git. Coach får relevant utdrag i hver DM; modellen kan kalle `remember_fact`; etter hver tur kjører **auto-læring** (kort LLM-ekstraksjon, dedupe). På Fly: sett `GITHUB_TOKEN` + `GITHUB_REPO` for pull/commit.
+- **Nå:** [`session_store.py`](../coach-bot/src/coach_bot/session_store.py) (SQLite) – kort samtale + `pending_actions` for Intervals-bekreftelse.
 - **Fly:** Ephemeral disk – `sessions.db` kan nullstilles ved redeploy (pending «ja» kan forsvinne). Valgfritt Fly volume eller restart etter deploy.
-- **Fase 2 (valgfri):** Supabase kun som `SessionStore`-backend (samme API, tabeller `turns` + `pending_actions`). **Ikke** flytt COACH_BRIEF, Intervals eller repo-hit dit. Intervals + git forblir source of truth.
+- **Fase 2 (valgfri):** Supabase kun som `SessionStore`-backend (samme API, tabeller `turns` + `pending_actions`). **Ikke** flytt Atlas, COACH_BRIEF, Intervals eller repo-hit dit. Intervals + git forblir source of truth.
 
 ## Senere
 
