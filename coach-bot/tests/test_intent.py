@@ -57,3 +57,9 @@ def test_lag_ukeplan_create_flag():
     msg = "lag en ukeplan og legg inn ukeplanen i intervals"
     assert asks_to_create_week_plan(msg)
     assert wants_week_plan_write(msg)
+
+
+def test_ukeplan_sync_base0_not_capabilities_template():
+    msg = "Kan du lage ukeplan neste 7 dager sync base0"
+    assert wants_week_plan_write(msg) or asks_for_plan_sync(msg)
+    assert not asks_capabilities(msg)

@@ -68,6 +68,13 @@ def test_create_workouts_rejects_bad_dates():
     assert not ctx.staged_events
 
 
+def test_create_workouts_caps_duration():
+    ctx = _ctx()
+    args = {"workouts": [{"date": "2026-09-20", "sport": "bike", "duration_min": 300}]}
+    execute_tool("create_workouts", args, ctx)
+    assert ctx.staged_events[0]["planned_duration"] == 240 * 60
+
+
 def test_remember_fact_tool(tmp_path):
     from coach_bot.repo_reader import RepoReader
     from coach_bot.config import Settings
