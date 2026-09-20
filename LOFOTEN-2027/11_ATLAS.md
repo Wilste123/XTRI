@@ -5,6 +5,7 @@ Coach oppdaterer denne filen når William deler **varige fakta** (utstyr, prefer
 *Automatiske og manuelle notater har format `- YYYY-MM-DD: tekst` under riktig seksjon.*
 
 ## Utstyr og setup
+- 2026-09-20: William har en bakgrunn innen sykling.
 
 ## Preferanser og vaner
 
