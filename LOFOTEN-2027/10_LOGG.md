@@ -1,5 +1,13 @@
 # Logg – beslutninger og notater
 
+### BESLUTNING – 2026-09-20
+
+**Beslutning:** Proaktiv morgenbriefing aktivert (`MORNING_BRIEFING_ENABLED=true`, kl. 07:00 Europe/Oslo). Ukebriefing forblir av.
+
+**Begrunnelse:** OP/Slack DM skal gi daglig status uten manuell forespørsel; flagget stod på `false`, så APScheduler startet aldri.
+
+---
+
 ### BESLUTNING – 2026-09-19
 
 **Beslutning:** `coach-bot/.env` skal ligge i git (test/prototype). Agenter skal ikke fjerne eller gitignore den uten ny beslutning.
