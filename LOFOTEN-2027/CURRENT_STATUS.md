@@ -41,3 +41,4 @@ Coach bruker **COACH_BRIEF** (Intervals + aktiv ukeplan + CURRENT_STATUS). Bedre
 ## Kort notat (valgfritt)
 
 Prosjekt startet. Coach-bot V1 kobler Slack + Intervals + dette repoet.
+- 2026-09-20: Testet full DM-sjekkliste 20. sep – coach OK på Fly
