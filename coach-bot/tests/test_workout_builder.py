@@ -11,10 +11,16 @@ def test_parse_athlete_ftp():
 
 
 def test_validate_threshold_syntax():
-    text = build_workout("threshold_ride").workout_text
+    b = build_workout("threshold_ride")
+    assert b is not None
+    text = b.workout_text
     val = validate_workout_syntax(text)
     assert val.ok
     assert val.estimated_minutes >= 60
+    assert "Warmup" in text
+    assert "6x" in text
+    assert "Main set" not in text
+    assert b.planned_load > 0
 
 
 def test_estimate_repeat_block():
@@ -47,5 +53,6 @@ def test_enrich_event_adds_syntax():
         "planned_duration": 4200,
     }
     out = enrich_event_dict(ev, phase="Base_0")
-    assert out["description"].startswith("-")
+    assert "Warmup" in out["description"]
+    assert out.get("icu_training_load", 0) > 0
     assert "Main set" in out["description"] or "65% HR" in out["description"]

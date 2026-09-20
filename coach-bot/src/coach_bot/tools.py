@@ -369,8 +369,9 @@ def tool_schemas(web_search_enabled: bool | None = None) -> list[dict[str, Any]]
 
 def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) -> dict[str, Any] | None:
     from coach_bot.intervals_planner import coach_external_id, estimate_planned_load
+    from coach_bot.intervals_event import finalize_workout_event
     from coach_bot.intervals_workout_syntax import (
-        merge_event_description,
+        api_workout_description,
         validate_workout_syntax,
     )
     from coach_bot.workout_builder import build_workout
@@ -400,6 +401,7 @@ def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) 
     session_type = (w.get("session_type") or "").strip().lower()
     target = None
     name = (w.get("name") or "").strip()
+    built = None
 
     if session_type and not workout_text:
         try:
@@ -440,7 +442,7 @@ def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) 
         if not val.ok:
             return None
         mins = val.estimated_minutes or mins
-        desc = merge_event_description(workout_text, coach_notes)
+        desc = api_workout_description(workout_text)
     else:
         mins = max(15, min(mins, 240))
         parts = [w.get("description") or "", w.get("structure") or ""]
@@ -471,7 +473,10 @@ def _event_from_tool_workout(w: dict[str, Any], ctx: ToolContext | None = None) 
     }
     if target:
         event["target"] = target
-    return event
+    if built and session_type:
+        event["icu_training_load"] = built.planned_load
+        event["load"] = built.planned_load
+    return finalize_workout_event(event)
 
 
 def _tool_create_workouts(args: dict[str, Any], ctx: ToolContext) -> str:

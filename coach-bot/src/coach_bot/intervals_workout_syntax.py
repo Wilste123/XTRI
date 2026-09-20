@@ -10,6 +10,10 @@ _STEP = re.compile(
     re.I,
 )
 _REPEAT = re.compile(r"^\s*(?:main\s+set\s+)?(\d+)\s*x\s*$", re.I)
+_SECTION = re.compile(
+    r"^(Warmup|Warm up|Cooldown|Cool down|Cool Down|Active|Main set|Main Set)\s*$",
+    re.I,
+)
 _TARGET = re.compile(
     r"(\d+(?:\.\d+)?)\s*%\s*(?:-\s*(\d+(?:\.\d+)?)\s*%)?\s*(HR|FTP|W|w|Pace|pace|Z\d)",
     re.I,
@@ -58,6 +62,13 @@ def estimate_workout_minutes(text: str) -> int:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
+        if _SECTION.match(line):
+            if in_repeat and block_mins:
+                total += repeat * block_mins
+                in_repeat = False
+                repeat = 1
+                block_mins = 0
+            continue
         rm = _REPEAT.match(line)
         if rm:
             if in_repeat and block_mins:
@@ -93,7 +104,7 @@ def validate_workout_syntax(text: str, *, max_minutes: int = 240) -> SyntaxValid
     has_target = False
     for raw in text.splitlines():
         line = raw.strip()
-        if not line or _REPEAT.match(line):
+        if not line or _REPEAT.match(line) or _SECTION.match(line):
             continue
         if line.startswith("-"):
             step_lines += 1
@@ -119,6 +130,25 @@ def validate_workout_syntax(text: str, *, max_minutes: int = 240) -> SyntaxValid
     return SyntaxValidation(ok=ok, errors=errors, estimated_minutes=est, step_lines=step_lines)
 
 
+def extract_workout_syntax(description: str) -> str:
+    """Keep only lines Intervals can compile (sections, repeats, steps)."""
+    if not description:
+        return ""
+    syntax_lines: list[str] = []
+    for line in description.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if (
+            stripped.startswith("-")
+            or _REPEAT.match(stripped)
+            or stripped.lower().startswith("main set")
+            or _SECTION.match(stripped)
+        ):
+            syntax_lines.append(stripped)
+    return "\n".join(syntax_lines).strip()
+
+
 def split_syntax_and_notes(description: str) -> tuple[str, str]:
     """Separate Intervals syntax block from free coach notes."""
     if not description:
@@ -137,6 +167,7 @@ def split_syntax_and_notes(description: str) -> tuple[str, str]:
             stripped.startswith("-")
             or _REPEAT.match(stripped)
             or stripped.lower().startswith("main set")
+            or _SECTION.match(stripped)
         ):
             syntax_lines.append(line)
             continue
@@ -146,8 +177,14 @@ def split_syntax_and_notes(description: str) -> tuple[str, str]:
 
 
 def merge_event_description(syntax: str, coach_notes: str = "") -> str:
-    syntax = (syntax or "").strip()
+    """Preview text for Slack (may include notes). API payload must use syntax only."""
+    syntax = extract_workout_syntax((syntax or "").strip()) or (syntax or "").strip()
     notes = (coach_notes or "").strip()
     if syntax and notes:
         return f"{syntax}\n\n{notes}"
     return syntax or notes
+
+
+def api_workout_description(syntax: str) -> str:
+    """Description field for Intervals API – syntax only, no coach prose."""
+    return extract_workout_syntax(syntax) or (syntax or "").strip()

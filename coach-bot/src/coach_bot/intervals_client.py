@@ -168,10 +168,13 @@ class IntervalsClient:
     def bulk_upsert_events(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not events:
             return []
+        from coach_bot.intervals_event import finalize_workout_events
+
+        payload = finalize_workout_events(events)
         r = self._client.post(
             f"/athlete/{self._athlete_id}/events/bulk",
-            params={"upsert": "true"},
-            json=events,
+            params={"upsert": "true", "resolve": "true"},
+            json=payload,
         )
         r.raise_for_status()
         self.invalidate_cache()

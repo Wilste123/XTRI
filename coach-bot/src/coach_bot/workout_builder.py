@@ -8,10 +8,8 @@ from typing import Any
 
 from coach_bot.athlete_thresholds import AthleteThresholds
 from coach_bot.intervals_planner import _detect_type, estimate_planned_load
-from coach_bot.intervals_workout_syntax import (
-    merge_event_description,
-    validate_workout_syntax,
-)
+from coach_bot.intervals_event import finalize_workout_event
+from coach_bot.intervals_workout_syntax import validate_workout_syntax
 
 SESSION_TYPES = frozenset(
     {
@@ -66,17 +64,20 @@ def infer_session_type(workout_cell: str, sport_type: str) -> str | None:
 
 
 def _template_threshold_ride(reps: int = 6, work_min: int = 8, rec_min: int = 3) -> str:
+    # Intervals.icu: section headers + «6x» (not «Main set 6x») + steps with «- duration target»
     return (
+        "Warmup\n"
         f"- 25m 65% HR\n\n"
-        f"Main set {reps}x\n"
+        f"{reps}x\n"
         f"- {work_min}m 85%-90% HR\n"
-        f"- {rec_min}m recovery at 65%-70% HR\n\n"
-        "20 min effektiv nedkjøring. Lett tråkk; sitting uten hender ok på flate strekk."
+        f"- {rec_min}m 65%-70% HR\n\n"
+        "Cooldown\n"
+        "- 15m 55% HR"
     )
 
 
 def _template_easy_ride(minutes: int = 45) -> str:
-    return f"- {minutes}m Z2 HR"
+    return f"Warmup\n- {minutes}m Z2 HR"
 
 
 def _template_recovery_ride(minutes: int = 35) -> str:
@@ -85,9 +86,11 @@ def _template_recovery_ride(minutes: int = 35) -> str:
 
 def _template_test_run_20() -> str:
     return (
+        "Warmup\n"
         "- 10m 65% HR\n\n"
-        "Main set 1x\n"
+        "Active\n"
         "- 20m 85%-90% HR\n\n"
+        "Cooldown\n"
         "- 10m 60% HR"
     )
 
@@ -205,8 +208,8 @@ def build_workout(
     if not val.ok:
         return None
     dur = val.estimated_minutes or duration_min or 45
-    load = estimate_planned_load(dur, 6.0 if "threshold" in st else 4.5)
-    desc = merge_event_description(workout_text, coach_notes)
+    load = estimate_planned_load(dur, 6.5 if "threshold" in st else 4.5)
+    from coach_bot.intervals_workout_syntax import api_workout_description
 
     return BuiltWorkout(
         name=name[:80],
@@ -216,7 +219,7 @@ def build_workout(
         target=target,
         duration_min=dur,
         planned_load=load,
-        description=desc[:4000],
+        description=api_workout_description(workout_text)[:4000],
     )
 
 
@@ -259,7 +262,7 @@ def enrich_event_dict(
     out["icu_training_load"] = built.planned_load
     if built.target:
         out["target"] = built.target
-    return out
+    return finalize_workout_event(out)
 
 
 def enrich_events_list(

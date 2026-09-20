@@ -82,7 +82,9 @@ def test_create_workouts_session_type_threshold():
     }
     execute_tool("create_workouts", args, ctx)
     ev = ctx.staged_events[0]
-    assert "Main set" in ev["description"]
+    assert "Warmup" in ev["description"]
+    assert ev.get("icu_training_load", 0) > 0
+    assert ev.get("moving_time", 0) > 0
     assert ev["type"] == "Ride"
     assert ev.get("target") == "HR"
 
@@ -100,8 +102,9 @@ def test_build_workout_tool():
     out = execute_tool(
         "build_workout", {"session_type": "threshold_ride", "sport": "bike"}, ctx
     )
-    assert "Main set" in out
-    assert "260" in out
+    assert "Warmup" in out
+    assert "6x" in out
+    assert "load" in out.lower()
 
 
 def test_create_workouts_caps_duration():
